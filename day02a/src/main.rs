@@ -1,15 +1,13 @@
-use std::collections::HashMap;
 use regex::Regex;
+use std::collections::HashMap;
 
 struct Draw {
     r: usize,
     g: usize,
-    b: usize
+    b: usize,
 }
 
-fn main() {
-    let input = include_str!("../input.txt");
-
+fn solution(input: &str) -> usize {
     let mut games: HashMap<usize, Vec<Draw>> = HashMap::new();
 
     let red_re = Regex::new(r"(\d+) red").unwrap();
@@ -20,17 +18,17 @@ fn main() {
         let parts: Vec<&str> = l.split(':').collect();
         let game_id: usize = parts[0][5..].parse().unwrap();
 
-        let draws: Vec<Draw> = parts[1].trim().split(';').map(|text| {
-            let r = red_re.captures(text).map_or(0, |c |c[1].parse().unwrap());
-            let g = green_re.captures(text).map_or(0, |c| c[1].parse().unwrap());
-            let b = blue_re.captures(text).map_or(0, |c| c[1].parse().unwrap());
+        let draws: Vec<Draw> = parts[1]
+            .trim()
+            .split(';')
+            .map(|text| {
+                let r = red_re.captures(text).map_or(0, |c| c[1].parse().unwrap());
+                let g = green_re.captures(text).map_or(0, |c| c[1].parse().unwrap());
+                let b = blue_re.captures(text).map_or(0, |c| c[1].parse().unwrap());
 
-            Draw {
-                r,
-                g,
-                b
-            }
-        }).collect();
+                Draw { r, g, b }
+            })
+            .collect();
 
         games.insert(game_id, draws);
     }
@@ -44,7 +42,20 @@ fn main() {
         }
     });
 
-    let game_sum: usize = possible_games.sum();
+    possible_games.sum()
+}
 
-    println!("Result: {}", game_sum);
+fn main() {
+    let input = include_str!("../input.txt");
+    let res = solution(input);
+
+    println!("Result: {}", res);
+}
+
+#[test]
+fn test_solution() {
+    let input = include_str!("../input.txt");
+    let res = solution(input);
+
+    assert_eq!(res, 2076);
 }
