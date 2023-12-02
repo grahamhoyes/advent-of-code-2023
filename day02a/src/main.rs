@@ -1,5 +1,4 @@
 use regex::Regex;
-use std::collections::HashMap;
 
 struct Draw {
     r: usize,
@@ -12,7 +11,7 @@ fn solution(input: &str) -> usize {
     let green_re = Regex::new(r"(\d+) green").unwrap();
     let blue_re = Regex::new(r"(\d+) blue").unwrap();
 
-    let games: HashMap<usize, Vec<Draw>> = input
+    input
         .lines()
         .map(|l| {
             let parts: Vec<&str> = l.split(':').collect();
@@ -32,18 +31,14 @@ fn solution(input: &str) -> usize {
 
             (game_id, draws)
         })
-        .collect();
-
-    // Possible games with 12 red, 13 green, and 14 blue
-    let possible_games = games.iter().filter_map(|(k, draws)| {
-        if draws.iter().all(|d| d.r <= 12 && d.g <= 13 && d.b <= 14) {
-            Some(k)
-        } else {
-            None
-        }
-    });
-
-    possible_games.sum()
+        .filter_map(|(id, draws)| {
+            if draws.iter().all(|d| d.r <= 12 && d.g <= 13 && d.b <= 14) {
+                Some(id)
+            } else {
+                None
+            }
+        })
+        .sum()
 }
 
 fn main() {

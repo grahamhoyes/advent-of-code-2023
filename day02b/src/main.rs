@@ -1,5 +1,4 @@
 use regex::Regex;
-use std::collections::HashMap;
 
 struct Draw {
     r: usize,
@@ -12,13 +11,12 @@ fn solution(input: &str) -> usize {
     let green_re = Regex::new(r"(\d+) green").unwrap();
     let blue_re = Regex::new(r"(\d+) blue").unwrap();
 
-    let games: HashMap<usize, Vec<Draw>> = input
+    input
         .lines()
         .map(|l| {
             let parts: Vec<&str> = l.split(':').collect();
-            let game_id: usize = parts[0][5..].parse().unwrap();
 
-            let draws: Vec<Draw> = parts[1]
+            parts[1]
                 .trim()
                 .split(';')
                 .map(|text| {
@@ -28,21 +26,15 @@ fn solution(input: &str) -> usize {
 
                     Draw { r, g, b }
                 })
-                .collect();
-
-            (game_id, draws)
+                .collect::<Vec<Draw>>()
         })
-        .collect();
-
-    games
-        .values()
         .map(|draws| {
             // Figure out the minimum number of cubes required to play each game
             let min_r = draws.iter().map(|d| d.r).max().unwrap();
             let min_g = draws.iter().map(|d| d.g).max().unwrap();
             let min_b = draws.iter().map(|d| d.b).max().unwrap();
 
-            // Compute the power of th game
+            // Compute the power of the game
             min_r * min_g * min_b
         })
         .sum()
