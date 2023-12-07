@@ -80,21 +80,13 @@ impl From<&str> for HandType {
         let joker_count = counts.remove(&'J').unwrap_or(0);
 
         // Sorted counts won't contain any jokers
-        let mut sorted_counts = counts
-            .iter()
-            .map(|(val, count)| (val, *count))
-            .collect::<Vec<_>>();
-        sorted_counts.sort_by_key(|(_val, count)| Reverse(*count));
+        let mut sorted_counts = counts.values().cloned().collect::<Vec<_>>();
+        sorted_counts.sort_by_key(|x| Reverse(*x));
 
-        // Add joker_count to the count of the first item in sorted_counts
+        // Add joker_count to the count of the most occurring other card
         if !sorted_counts.is_empty() {
-            sorted_counts[0].1 += joker_count;
+            sorted_counts[0] += joker_count;
         }
-
-        let sorted_counts = sorted_counts
-            .iter()
-            .map(|(_val, count)| *count)
-            .collect::<Vec<_>>();
 
         match counts.len() {
             // 0 left means they were all jokers
