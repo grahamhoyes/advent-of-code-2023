@@ -11,6 +11,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_example() {
         let input = include_str!("../example.txt");
