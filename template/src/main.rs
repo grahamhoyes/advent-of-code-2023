@@ -9,19 +9,22 @@ fn main() {
     println!("Result: {}", res);
 }
 
-#[test]
-fn test_example() {
-    let input = include_str!("../example.txt");
-    let res = solution(input);
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_example() {
+        let input = include_str!("../example.txt");
+        let res = solution(input);
 
-    assert_eq!(res, 0);
-}
+        assert_eq!(res, 0);
+    }
 
 
-#[test]
-fn test_input() {
-    let input = include_str!("../input.txt");
-    let res = solution(input);
+    #[test]
+    fn test_input() {
+        let input = include_str!("../input.txt");
+        let res = solution(input);
 
-    assert_eq!(res, 0);
+        assert_eq!(res, 0);
+    }
 }
