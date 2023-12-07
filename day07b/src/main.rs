@@ -4,24 +4,16 @@ use std::collections::HashMap;
 /// A Card in a hand.
 ///
 /// By deriving PartialOrd, these are sorted in lexicographic order:
-/// A is ordered lowest, and Two the highest. When combined with how HandType
-/// and Hard are also ordered, this means that the highest value hand will be
-/// first when calling .sort() on a Vec of Hands.
+/// J is the lowest, then number cards, and A is the highest. Num variants are sorted
+/// by their contained value.
 #[derive(PartialOrd, PartialEq, Ord, Eq, Debug)]
 enum Card {
-    A,
-    K,
-    Q,
-    T,
-    Nine,
-    Eight,
-    Seven,
-    Six,
-    Five,
-    Four,
-    Three,
-    Two,
     J,
+    Num(char),
+    T,
+    Q,
+    K,
+    A,
 }
 
 impl From<char> for Card {
@@ -32,14 +24,7 @@ impl From<char> for Card {
             'Q' => Self::Q,
             'J' => Self::J,
             'T' => Self::T,
-            '9' => Self::Nine,
-            '8' => Self::Eight,
-            '7' => Self::Seven,
-            '6' => Self::Six,
-            '5' => Self::Five,
-            '4' => Self::Four,
-            '3' => Self::Three,
-            '2' => Self::Two,
+            '2'..='9' => Self::Num(c),
             _ => panic!("Invalid card: {}", c),
         }
     }
@@ -48,24 +33,24 @@ impl From<char> for Card {
 /// The type of a hand.
 ///
 /// Like Card, these are sorted in lexicographic order, with the lowest
-/// ordered value being FiveKind and the highest HighCard. When a Hand is sorted,
-/// this means that the highest value hand will be first.
+/// ordered value being HighCard and the highest FiveKind. The final Hand
+/// iterator will need to be reversed to get the highest value first.
 #[derive(PartialOrd, PartialEq, Ord, Eq, Debug)]
 enum HandType {
-    // All identical cards
-    FiveKind,
-    // Four identical cards
-    FourKind,
-    // A pair and trio of identical cards
-    FullHouse,
-    // Three identical cards and two unique
-    ThreeKind,
-    // Two pairs of identical cards and one unique
-    TwoPair,
-    // One pair of identical cards and three unique
-    OnePair,
     // All distinct cards
     HighCard,
+    // One pair of identical cards and three unique
+    OnePair,
+    // Two pairs of identical cards and one unique
+    TwoPair,
+    // Three identical cards and two unique
+    ThreeKind,
+    // A pair and trio of identical cards
+    FullHouse,
+    // Four identical cards
+    FourKind,
+    // All identical cards
+    FiveKind,
 }
 
 impl From<&str> for HandType {
@@ -116,6 +101,11 @@ impl From<&str> for HandType {
     }
 }
 
+/// A hand of cards.
+///
+/// Like the types above, this is ordered in lexicographic order (by field).
+/// Hands are sorted by HandType first, then failing that by the value of their
+/// cards. This ordering is from lowest to highest.
 #[derive(PartialOrd, PartialEq, Ord, Eq, Debug)]
 struct Hand {
     // type is a reserved keyword, could do "r#type" but this looks better
@@ -134,7 +124,7 @@ fn solution(input: &str) -> usize {
             let hand_type = HandType::from(cards);
             let bid: usize = parts.next().unwrap().parse().unwrap();
 
-            let cards = cards.chars().map(Card::from).collect::<Vec<_>>();
+            let cards = cards.chars().map(Card::from).collect();
 
             Hand {
                 hand_type,
@@ -146,11 +136,8 @@ fn solution(input: &str) -> usize {
 
     hands.sort();
 
-    hands
-        .iter()
-        .enumerate()
-        .map(|(i, h)| h.bid * (hands.len() - i))
-        .sum()
+    // The iterator is from lowest to highest, so the rank of card i is i+1
+    hands.iter().enumerate().map(|(i, h)| h.bid * (i + 1)).sum()
 }
 
 fn main() {
