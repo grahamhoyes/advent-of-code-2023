@@ -1,11 +1,10 @@
-use num::integer::lcm;
+use num::Integer; // Integer trait gives us the lcm method
 use regex::Regex;
 use std::collections::HashMap;
 
 fn solution(input: &str) -> usize {
     let mut lines = input.lines();
 
-    // Infinite cyclic iterator over the sequence of moves
     let raw_sequence = lines.next().unwrap().trim();
 
     // Skip the next blank line
@@ -29,8 +28,6 @@ fn solution(input: &str) -> usize {
         .filter(|key| key.ends_with('A'))
         .collect::<Vec<_>>();
 
-    let mut num_steps: Vec<usize> = (0..current_nodes.len()).map(|_| 0).collect();
-
     // Actually computing all paths in parallel until they converge would take way,
     // way too long. However, there's a trick in the input: The paths are cyclic.
     // When you reach an ending node, the next step in the sequence will take you
@@ -38,24 +35,25 @@ fn solution(input: &str) -> usize {
     // steps each sequence takes on its own, and compute the LCM of those.
     let mut lcm: usize = 1;
 
-    for i in 0..current_nodes.len() {
+    for node in current_nodes.iter_mut() {
+        let mut num_steps: usize = 0;
+
+        // Restart the sequence for this path
         let mut sequence = raw_sequence.chars().cycle();
 
-        while !current_nodes[i].ends_with('Z') {
-            num_steps[i] += 1;
-            let next = nodes.get(current_nodes[i]).unwrap();
+        while !node.ends_with('Z') {
+            num_steps += 1;
+            let next = nodes.get(*node).unwrap();
 
-            let dir = sequence.next().unwrap();
-
-            match dir {
-                'L' => current_nodes[i] = &next.0,
-                'R' => current_nodes[i] = &next.1,
+            *node = match sequence.next().unwrap() {
+                'L' => &next.0,
+                'R' => &next.1,
                 _ => unreachable!(),
             }
         }
-    }
 
-    let lcm: usize = num_steps.iter().fold(1, |acc, x| lcm(acc, *x));
+        lcm = lcm.lcm(&num_steps);
+    }
 
     lcm
 }
@@ -84,6 +82,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 11309);
+        assert_eq!(res, 13740108158591);
     }
 }

@@ -30,9 +30,9 @@ fn solution(input: &str) -> usize {
         let n = nodes.get(current_node).unwrap();
         steps += 1;
 
-        match sequence.next().unwrap() {
-            'L' => current_node = n.0.as_str(),
-            'R' => current_node = n.1.as_str(),
+        current_node = match sequence.next().unwrap() {
+            'L' => n.0.as_str(),
+            'R' => n.1.as_str(),
             _ => unreachable!(),
         }
     }
