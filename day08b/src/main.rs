@@ -1,3 +1,4 @@
+use num::integer::lcm;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -5,7 +6,7 @@ fn solution(input: &str) -> usize {
     let mut lines = input.lines();
 
     // Infinite cyclic iterator over the sequence of moves
-    let mut sequence = lines.next().unwrap().trim().chars().cycle();
+    let raw_sequence = lines.next().unwrap().trim();
 
     // Skip the next blank line
     lines.next().unwrap();
@@ -27,41 +28,36 @@ fn solution(input: &str) -> usize {
         .keys()
         .filter(|key| key.ends_with('A'))
         .collect::<Vec<_>>();
-    let num_paths = current_nodes.len();
 
-    println!("Number of paths to follow: {}", num_paths);
+    let mut num_steps: Vec<usize> = (0..current_nodes.len()).map(|_| 0).collect();
 
-    let mut steps = 0;
-    let mut num_complete = 0;
+    // Actually computing all paths in parallel until they converge would take way,
+    // way too long. However, there's a trick in the input: The paths are cyclic.
+    // When you reach an ending node, the next step in the sequence will take you
+    // back to the start of that path. Therefore, we just need to figure out how many
+    // steps each sequence takes on its own, and compute the LCM of those.
+    let mut lcm: usize = 1;
 
-    // This is far to slow to run in any reasonable amount of time
-    // while !current_nodes.iter().all(|node| node.ends_with('Z')) {
-    while num_complete < num_paths {
-        steps += 1;
-        num_complete = 0;
+    for i in 0..current_nodes.len() {
+        let mut sequence = raw_sequence.chars().cycle();
 
-        let dir = sequence.next().unwrap();
+        while !current_nodes[i].ends_with('Z') {
+            num_steps[i] += 1;
+            let next = nodes.get(current_nodes[i]).unwrap();
 
-        for node in current_nodes.iter_mut() {
-            let next = nodes.get(*node).unwrap();
+            let dir = sequence.next().unwrap();
 
             match dir {
-                'L' => *node = &next.0,
-                'R' => *node = &next.1,
+                'L' => current_nodes[i] = &next.0,
+                'R' => current_nodes[i] = &next.1,
                 _ => unreachable!(),
             }
-
-            if node.ends_with('Z') {
-                num_complete += 1
-            }
-        }
-
-        if num_complete > 2 {
-            println!("Number complete: {num_complete}");
         }
     }
 
-    steps
+    let lcm: usize = num_steps.iter().fold(1, |acc, x| lcm(acc, *x));
+
+    lcm
 }
 
 fn main() {
