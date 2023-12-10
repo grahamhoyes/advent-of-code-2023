@@ -97,6 +97,10 @@ impl Pipe {
     fn is_connected_to(&self, other: Coord) -> bool {
         self.connected.iter().any(|c| c == &other)
     }
+
+    fn is_angled(&self) -> bool {
+        matches!(self.symbol, 'F' | '7' | 'J' | 'L')
+    }
 }
 
 enum Cell {
@@ -372,6 +376,8 @@ fn solution(input: &str) -> usize {
     while cur.position != field.start {
         let dir = cur.position - prev.position;
 
+        // println!("Direction: {:?}", dir);
+
         let delta_right = if dir.0 == 0 {
             Coord(-dir.1, dir.0)
         } else {
@@ -399,26 +405,66 @@ fn solution(input: &str) -> usize {
             }
         }
 
+        let next_coord = cur.next_from(&prev);
+        let next = field.get(&next_coord).unwrap().pipe().clone();
+
+        if cur.is_angled() {
+            // To properly handle corner pieces, we also need to check what the
+            // next direction is going to be and handle that case.
+            let next_dir = next.position - cur.position;
+
+            // println!("Current is angled. Next direction: {:?}", next_dir);
+
+            let delta_right = if next_dir.0 == 0 {
+                Coord(-next_dir.1, next_dir.0)
+            } else {
+                Coord(next_dir.1, next_dir.0)
+            };
+
+            if let Some(count) = contained_right {
+                let right_neighbor = cur.position + delta_right;
+
+                if let Some(visited) = field.search_from(right_neighbor) {
+                    contained_right = Some(count + visited);
+                } else {
+                    // Reached the edge of the board, so permanently end this count
+                    contained_right = None
+                }
+            }
+
+            if let Some(count) = contained_left {
+                let left_neighbor = cur.position - delta_right;
+
+                if let Some(visited) = field.search_from(left_neighbor) {
+                    contained_left = Some(count + visited);
+                } else {
+                    contained_left = None
+                }
+            }
+        };
+
         // field.print_step(&cur.position, &dir);
         // println!(
         //     "Current: {:?} | Contained right: {:?} | Contained left: {:?}",
         //     cur.position, contained_right, contained_left
         // );
-        //
+
+        // let next_coord = cur.next_from(&prev);
+        prev = cur;
+        // cur = field.get(&next_coord).unwrap().pipe().clone();
+        cur = next;
+
+        // Pause until input
         // let mut buf = String::new();
         // io::stdin().read_line(&mut buf).unwrap();
-
-        let next_coord = cur.next_from(&prev);
-        prev = cur;
-        cur = field.get(&next_coord).unwrap().pipe().clone();
     }
 
-    println!("{}", field);
-
-    println!(
-        "Contained right: {:?}, contained left: {:?}",
-        contained_right, contained_left
-    );
+    // println!("{}", field);
+    //
+    // println!(
+    //     "Contained right: {:?}, contained left: {:?}",
+    //     contained_right, contained_left
+    // );
 
     contained_right.or(contained_left).unwrap()
 }
@@ -467,10 +513,20 @@ mod tests {
     }
 
     #[test]
+    fn test_no_adjacent_straights() {
+        // This input has one enclosed cell that has no straight lines
+        // next to it
+        let input = include_str!("../example_5.txt");
+        let res = solution(input);
+
+        assert_eq!(res, 2);
+    }
+
+    #[test]
     fn test_input() {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 6842);
+        assert_eq!(res, 393);
     }
 }
