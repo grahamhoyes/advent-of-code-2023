@@ -25,23 +25,102 @@ impl Sub<(i32, i32)> for Coord {
     }
 }
 
-struct Field(Vec<Vec<Option<Pipe>>>);
+struct Field {
+    inner: Vec<Vec<Option<Pipe>>>,
+    start: Coord,
+}
 
 impl Field {
+    fn from_input(input: &str) -> Self {
+        // Position of the starting pipe, we'll come back and fill
+        // this in later
+        let mut start = Coord(-1, -1);
+
+        let mut field: Vec<Vec<Option<Pipe>>> = input
+            .lines()
+            .enumerate()
+            .map(|(y, l)| {
+                l.chars()
+                    .enumerate()
+                    .map(|(x, c)| {
+                        let here = Coord(x as i32, y as i32);
+
+                        let connected = match c {
+                            '.' => {
+                                return None;
+                            }
+                            'S' => {
+                                start = here;
+                                return None;
+                            }
+                            '|' => [here - (0, 1), here + (0, 1)],
+                            '-' => [here - (1, 0), here + (1, 0)],
+                            'L' => [here - (0, 1), here + (1, 0)],
+                            'J' => [here - (0, 1), here - (1, 0)],
+                            '7' => [here - (1, 0), here + (0, 1)],
+                            'F' => [here + (1, 0), here + (0, 1)],
+                            _ => unreachable!(),
+                        };
+
+                        Some(Pipe {
+                            position: here,
+                            connected,
+                        })
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // From the start, we have to find the connected pipes to start our search
+        let mut start_connected: Vec<Coord> = Vec::with_capacity(2);
+
+        for x in [-1, 0, 1] {
+            for y in [-1, 0, 1] {
+                let coord = start + (x, y);
+
+                if !coord.is_valid() {
+                    continue;
+                }
+
+                if let Some(pipe) = field[coord.1 as usize][coord.0 as usize].as_ref() {
+                    if pipe.is_connected_to(start) {
+                        start_connected.push(pipe.position);
+                    }
+                }
+            }
+        }
+
+        assert_eq!(
+            start_connected.len(),
+            2,
+            "Found {} neighbors for the starting pipe, should be exactly 2",
+            start_connected.len()
+        );
+
+        // Insert the starting pipe into the playing field
+        field[start.1 as usize][start.0 as usize] = Some(Pipe {
+            position: start,
+            connected: [start_connected[0], start_connected[1]],
+        });
+
+        Self {
+            inner: field,
+            start,
+        }
+    }
+
     fn get(&self, coord: &Coord) -> Option<&Pipe> {
         if !coord.is_valid() {
             return None;
         }
 
-        self.0[coord.1 as usize][coord.0 as usize].as_ref()
+        self.inner[coord.1 as usize][coord.0 as usize].as_ref()
     }
 
-    fn set(&mut self, coord: &Coord, pipe: Pipe) {
-        if !coord.is_valid() {
-            panic!("Invalid coordinates {:?}", coord);
-        }
-
-        self.0[coord.1 as usize][coord.0 as usize] = Some(pipe);
+    fn get_start(&self) -> &Pipe {
+        self.inner[self.start.1 as usize][self.start.0 as usize]
+            .as_ref()
+            .unwrap()
     }
 }
 
@@ -72,84 +151,16 @@ impl Pipe {
 }
 
 fn solution(input: &str) -> usize {
-    let mut start = Coord(-1, -1);
-
-    let field: Vec<Vec<Option<Pipe>>> = input
-        .lines()
-        .enumerate()
-        .map(|(y, l)| {
-            l.chars()
-                .enumerate()
-                .map(|(x, c)| {
-                    let here = Coord(x as i32, y as i32);
-
-                    let connected = match c {
-                        '.' => {
-                            return None;
-                        }
-                        'S' => {
-                            start = here;
-                            return None;
-                        }
-                        '|' => [here - (0, 1), here + (0, 1)],
-                        '-' => [here - (1, 0), here + (1, 0)],
-                        'L' => [here - (0, 1), here + (1, 0)],
-                        'J' => [here - (0, 1), here - (1, 0)],
-                        '7' => [here - (1, 0), here + (0, 1)],
-                        'F' => [here + (1, 0), here + (0, 1)],
-                        _ => unreachable!(),
-                    };
-
-                    Some(Pipe {
-                        position: here,
-                        connected,
-                    })
-                })
-                .collect()
-        })
-        .collect();
-
-    let mut field = Field(field);
-
-    // From the start, we have to find the connected pipes to start our search
-    let mut start_connected: Vec<Coord> = Vec::with_capacity(2);
-
-    for x in [-1, 0, 1] {
-        for y in [-1, 0, 1] {
-            let coord = start + (x, y);
-
-            if let Some(pipe) = field.get(&coord) {
-                if pipe.is_connected_to(start) {
-                    start_connected.push(pipe.position);
-                }
-            }
-        }
-    }
-
-    assert_eq!(
-        start_connected.len(),
-        2,
-        "Found {} neighbors for the starting pipe, should be exactly 2",
-        start_connected.len()
-    );
-
-    // Insert the starting pipe into the playing field
-    field.set(
-        &start,
-        Pipe {
-            position: start,
-            connected: [start_connected[0], start_connected[1]],
-        },
-    );
+    let field = Field::from_input(input);
 
     // Figure out the length of the pipe by traversing it
     let mut len = 1;
-    let mut prev = field.get(&start).unwrap();
+    let mut prev = field.get(&field.start).unwrap();
 
     // Arbitrarily pick one of the next pipes to go to to set our direction
-    let mut cur = field.get(&start_connected[1]).unwrap();
+    let mut cur = field.get(&field.get_start().connected[1]).unwrap();
 
-    while cur.position != start {
+    while cur.position != field.start {
         let next_coord = cur.next_from(prev);
         prev = cur;
         cur = field.get(&next_coord).unwrap();
