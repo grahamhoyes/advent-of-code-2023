@@ -1,7 +1,5 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
-use std::io;
-use std::io::*;
 use std::iter::Iterator;
 use std::ops::{Add, Sub};
 
@@ -13,9 +11,9 @@ impl Coord {
         self.0 >= 0 && self.1 >= 0
     }
 
-    // Get a vector of the 8 neighbors of this cell.
-    // This should really return an iterator rather than allocating
-    // a vector, but I don't feel like creating the wrapper type to do that.
+    /// Get a vector of the 8 neighbors of this cell.
+    /// This should really return an iterator rather than allocating
+    /// a vector, but I don't feel like creating the wrapper type to do that.
     fn neighbors(&self) -> Vec<Coord> {
         let mut neighbors = Vec::with_capacity(8);
 
@@ -30,6 +28,35 @@ impl Coord {
         }
 
         neighbors
+    }
+
+    /// Treating this coordinate as a direction vector,
+    /// return the vector we could add to the current position
+    /// to get its right side.
+    ///
+    /// In the following table, arrows represent the direction
+    /// and dots are where the right side is. Coordinates are
+    /// (x, y).
+    ///
+    /// ```
+    ///  arrow | dir     | right offset
+    /// -------+---------+-------------
+    ///   ^ .  | (0, -1) | (1, 0)
+    /// -------+---------+-------------
+    ///  . v   | (0, 1)  | (-1, 0)
+    /// -------+---------+-------------
+    ///   >    | (1, 0)  | (0, 1)
+    ///   .    |         |
+    /// -------+---------+-------------
+    ///   .    | (-1, 0) | (0, -1)
+    ///   <    |         |
+    /// ```
+    fn right_side(&self) -> Coord {
+        if self.0 == 0 {
+            Coord(-self.1, self.0)
+        } else {
+            Coord(self.1, self.0)
+        }
     }
 }
 
@@ -276,16 +303,11 @@ impl Field {
     /// Otherwise, returns a Some variant with the number of empty cells visited
     /// (which will be marked as visited and never visited again).
     fn search_from(&mut self, coord: Coord) -> Option<usize> {
-        // println!("=== Starting search from {:?} ===", coord);
-
         let mut frontier: Vec<Coord> = vec![coord];
 
         let mut count = 0;
 
         while let Some(coord) = frontier.pop() {
-            // print!("\n{}", self);
-            // println!("Frontier: {:?}", frontier);
-
             // Checks if the cell is on the board
             if let Some(cell) = self.get(&coord) {
                 match cell {
@@ -295,9 +317,7 @@ impl Field {
 
                         // Enqueue all of this cell's neighbors (potentially ones
                         // we just came from, that's fine)
-                        let neighbors = coord.neighbors();
-                        // println!("Adding neighbors: {:?}", neighbors);
-                        frontier.extend(neighbors);
+                        frontier.extend(coord.neighbors());
 
                         // Mark the current cell as visited so we don't count it again
                         self.set(&coord, Cell::Visited);
@@ -314,6 +334,8 @@ impl Field {
         Some(count)
     }
 
+    /// Print the state of the board, indicating the position and direction
+    /// of the cursor.
     fn print_step(&self, current: &Coord, direction: &Coord) {
         for (y, row) in self.inner.iter().enumerate() {
             for (x, cell) in row.iter().enumerate() {
@@ -374,52 +396,21 @@ fn solution(input: &str) -> usize {
     let mut cur = field.get(&prev.connected[0]).unwrap().pipe().clone();
 
     while cur.position != field.start {
+        let next = field.get(&cur.next_from(&prev)).unwrap().pipe().clone();
+
         let dir = cur.position - prev.position;
 
-        // println!("Direction: {:?}", dir);
-
-        let delta_right = if dir.0 == 0 {
-            Coord(-dir.1, dir.0)
-        } else {
-            Coord(dir.1, dir.0)
-        };
-
-        if let Some(count) = contained_right {
-            let right_neighbor = cur.position + delta_right;
-
-            if let Some(visited) = field.search_from(right_neighbor) {
-                contained_right = Some(count + visited);
-            } else {
-                // Reached the edge of the board, so permanently end this count
-                contained_right = None
-            }
-        }
-
-        if let Some(count) = contained_left {
-            let left_neighbor = cur.position - delta_right;
-
-            if let Some(visited) = field.search_from(left_neighbor) {
-                contained_left = Some(count + visited);
-            } else {
-                contained_left = None
-            }
-        }
-
-        let next_coord = cur.next_from(&prev);
-        let next = field.get(&next_coord).unwrap().pipe().clone();
+        let mut directions_to_check = vec![dir];
 
         if cur.is_angled() {
-            // To properly handle corner pieces, we also need to check what the
-            // next direction is going to be and handle that case.
+            // To properly handle corner pieces, we also need to handle the direction
+            // we would be turning after the corner and handle that case
             let next_dir = next.position - cur.position;
+            directions_to_check.push(next_dir);
+        }
 
-            // println!("Current is angled. Next direction: {:?}", next_dir);
-
-            let delta_right = if next_dir.0 == 0 {
-                Coord(-next_dir.1, next_dir.0)
-            } else {
-                Coord(next_dir.1, next_dir.0)
-            };
+        for dir in directions_to_check {
+            let delta_right = dir.right_side();
 
             if let Some(count) = contained_right {
                 let right_neighbor = cur.position + delta_right;
@@ -441,30 +432,11 @@ fn solution(input: &str) -> usize {
                     contained_left = None
                 }
             }
-        };
+        }
 
-        // field.print_step(&cur.position, &dir);
-        // println!(
-        //     "Current: {:?} | Contained right: {:?} | Contained left: {:?}",
-        //     cur.position, contained_right, contained_left
-        // );
-
-        // let next_coord = cur.next_from(&prev);
         prev = cur;
-        // cur = field.get(&next_coord).unwrap().pipe().clone();
         cur = next;
-
-        // Pause until input
-        // let mut buf = String::new();
-        // io::stdin().read_line(&mut buf).unwrap();
     }
-
-    // println!("{}", field);
-    //
-    // println!(
-    //     "Contained right: {:?}, contained left: {:?}",
-    //     contained_right, contained_left
-    // );
 
     contained_right.or(contained_left).unwrap()
 }
