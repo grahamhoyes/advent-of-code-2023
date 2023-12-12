@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::iter::repeat;
 
 type Memo<'a> = HashMap<(&'a str, &'a [usize], usize), usize>;
 
@@ -86,6 +87,10 @@ fn solution(input: &str) -> usize {
         .map(|l| {
             let (pattern, runs) = l.split_once(' ').unwrap();
 
+            // Unfold the pattern and runs. Only change from part 1.
+            let pattern = repeat(pattern).take(5).collect::<Vec<_>>().join("?");
+            let runs = repeat(runs).take(5).collect::<Vec<_>>().join(",");
+
             let runs: Vec<usize> = runs.split(',').map(|x| x.parse().unwrap()).collect();
 
             (pattern.to_string(), runs)
@@ -114,7 +119,7 @@ mod tests {
         let input = include_str!("../example.txt");
         let res = solution(input);
 
-        assert_eq!(res, 21);
+        assert_eq!(res, 525152);
     }
 
     #[test]
@@ -122,6 +127,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 7771);
+        assert_eq!(res, 10861030975833);
     }
 }
