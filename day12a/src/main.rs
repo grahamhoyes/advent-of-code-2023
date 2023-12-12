@@ -10,13 +10,16 @@
 /// We pass `current` as a separate parameter from `pattern` to make recursive checking easier,
 /// without needing to allocate new strings.
 fn num_arrangements(
-    current: Option<char>,
-    pattern: &str,
-    runs: &[usize],
+    pattern: Option<&str>,
+    runs: Option<&[usize]>,
     current_run_count: usize,
 ) -> usize {
-    if current.is_none() {
-        return if runs.is_empty() {
+    if pattern.is_none() || pattern.unwrap().is_empty() {
+        return if (runs.is_some()
+            && runs.unwrap().len() == 1
+            && runs.unwrap()[0] == current_run_count)
+            || (runs.is_none() || runs.unwrap().is_empty())
+        {
             1
         } else {
             // No more patterns but more recorded counts means this branch
@@ -24,35 +27,63 @@ fn num_arrangements(
             0
         };
     }
+    // else if runs.is_none() || runs.unwrap().is_empty() {
+    //     // Not a valid base case, we might run out of runs before the rest of the
+    //     // pattern has been validated
+    //     return 0;
+    // }
 
-    let current = current.unwrap();
+    let pattern = pattern.unwrap();
 
-    println!("{}", pattern);
-    let next = pattern.chars().next();
-    let rest = &pattern[1..];
+    // println!("{:?}", pattern);
+    let current = pattern.chars().next().unwrap();
+    let rest = pattern.get(1..);
 
-    match current {
-        '#' => num_arrangements(next, rest, runs, current_run_count + 1),
-        '.' => {
-            if current_run_count == runs[0] {
-                // We finished observing a run of broken hot springs and it matched
-                // what we expected, so is valid.
-                num_arrangements(next, rest, &runs[1..], 0)
-            } else if current_run_count == 0 {
-                // Haven't started tracking a run yet, move along
-                num_arrangements(next, rest, runs, 0)
-            } else {
-                // We have finished observing a run, but it's length wasn't
-                // compatible with the known run lengths. Invalid path.
-                0
+    let values_to_check = if current == '?' {
+        ['.', '#']
+    } else {
+        // Rust wants to allocate an array of two elements on the stack,
+        // so use a space character as a dummy one we can skip
+        [current, ' ']
+    };
+
+    values_to_check
+        .iter()
+        .map(|c| {
+            println!(
+                "{}{}{}",
+                (0..10 - rest.map_or(0, |r| r.len()))
+                    .map(|_| ' ')
+                    .collect::<String>(),
+                c,
+                rest.map_or("", |x| x)
+            );
+            match c {
+                '#' => num_arrangements(rest, runs, current_run_count + 1),
+                '.' => {
+                    let first_run = runs.and_then(|r| r.first());
+
+                    // if current_run_count > 0 && first_run.is_none() {
+                    //     // We are tracking a run of broken hot springs, but expect no more
+                    //     0
+                    // } else
+                    if first_run.map_or(false, |length| current_run_count == *length) {
+                        // We finished observing a run of broken hot springs and it matched
+                        // what we expected, so is valid.
+                        num_arrangements(rest, runs.unwrap().get(1..), 0)
+                    } else if current_run_count == 0 {
+                        // Haven't started tracking a run yet, move along
+                        num_arrangements(rest, runs, 0)
+                    } else {
+                        // We have finished observing a run, but it's length wasn't
+                        // compatible with the known run lengths. Invalid path.
+                        0
+                    }
+                }
+                _ => 0,
             }
-        }
-        '?' => {
-            num_arrangements(Some('.'), pattern, runs, current_run_count)
-                + num_arrangements(Some('#'), pattern, runs, current_run_count)
-        }
-        _ => unreachable!(),
-    }
+        })
+        .sum()
 }
 
 fn solution(input: &str) -> usize {
@@ -63,9 +94,10 @@ fn solution(input: &str) -> usize {
 
             let runs: Vec<usize> = runs.split(',').map(|x| x.parse().unwrap()).collect();
 
-            let first_char = pattern.chars().next().unwrap();
+            let arrangements = num_arrangements(Some(pattern), Some(&runs), 0);
 
-            num_arrangements(Some(first_char), &pattern[1..], &runs, 0)
+            println!("{}: {}", pattern, arrangements);
+            arrangements
         })
         .sum()
 }
