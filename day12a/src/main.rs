@@ -2,31 +2,29 @@
 /// of observed hot springs with unknowns and known run lengths of the correct
 /// observations.
 ///
-///     `current`: The current byte at the beginning of the pattern
-///     `pattern`: A byte array of '.', '?', and '#', the rest of the pattern after `current`
+///     `pattern`: A string array of '.', '?', and '#'
 ///     `runs`: An array of numbers storing the correct length of each '#' run
 ///     `current_run_count`: The number of '#' that immediately precede the pattern
-///
-/// We pass `current` as a separate parameter from `pattern` to make recursive checking easier,
-/// without needing to allocate new strings.
-fn num_arrangements(pattern: Option<&str>, runs: &[usize], current_run_count: usize) -> usize {
-    if pattern.is_none() || pattern.unwrap().is_empty() {
-        return if (runs.len() == 1 && runs[0] == current_run_count)
-            || (runs.is_empty() && current_run_count == 0)
-        {
+fn num_arrangements(pattern: &str, runs: &[usize], current_run_count: usize) -> usize {
+    if pattern.is_empty() {
+        #[allow(clippy::if_same_then_else)]
+        return if runs.len() == 1 && runs[0] == current_run_count {
+            // Processed the entire pattern, and the run we were tracking matches
+            // the last one we needed
+            1
+        } else if runs.is_empty() && current_run_count == 0 {
+            // Processed the entire pattern, and we already found all
+            // the matches we need
             1
         } else {
-            // No more patterns but more recorded counts means this branch
-            // is impossible
+            // Processed the entire pattern, but there is still at least
+            // 1 unmatched run or we had a run that was too long
             0
         };
     }
 
-    let pattern = pattern.unwrap();
-
-    // println!("{:?}", pattern);
     let current = pattern.chars().next().unwrap();
-    let rest = pattern.get(1..);
+    let rest = pattern.get(1..).unwrap();
 
     let values_to_check = if current == '?' {
         ['.', '#']
@@ -36,18 +34,14 @@ fn num_arrangements(pattern: Option<&str>, runs: &[usize], current_run_count: us
         [current, ' ']
     };
 
-    let foo = values_to_check
+    values_to_check
         .iter()
         .map(|c| {
-            let foo = match c {
+            match c {
                 '#' => num_arrangements(rest, runs, current_run_count + 1),
                 '.' => {
                     let first_run = runs.first();
 
-                    // if current_run_count > 0 && first_run.is_none() {
-                    //     // We are tracking a run of broken hot springs, but expect no more
-                    //     0
-                    // } else
                     if first_run.map_or(false, |length| current_run_count == *length) {
                         // We finished observing a run of broken hot springs and it matched
                         // what we expected, so is valid.
@@ -62,34 +56,9 @@ fn num_arrangements(pattern: Option<&str>, runs: &[usize], current_run_count: us
                     }
                 }
                 _ => 0,
-            };
-
-            // println!(
-            //     "{}{}{} | Runs: {:?} | {}",
-            //     (0..5 - rest.map_or(0, |r| r.len()))
-            //         .map(|_| ' ')
-            //         .collect::<String>(),
-            //     c,
-            //     rest.map_or("", |x| x),
-            //     runs,
-            //     foo
-            // );
-
-            foo
+            }
         })
-        .sum();
-
-    // println!(
-    //     "{}{} | Runs: {:?} | {}",
-    //     (0..5 - rest.map_or(0, |r| r.len()))
-    //         .map(|_| ' ')
-    //         .collect::<String>(),
-    //     pattern,
-    //     runs,
-    //     foo
-    // );
-
-    foo
+        .sum()
 }
 
 fn solution(input: &str) -> usize {
@@ -100,10 +69,7 @@ fn solution(input: &str) -> usize {
 
             let runs: Vec<usize> = runs.split(',').map(|x| x.parse().unwrap()).collect();
 
-            let arrangements = num_arrangements(Some(pattern), &runs, 0);
-
-            // println!("{}: {}", pattern, arrangements);
-            arrangements
+            num_arrangements(pattern, &runs, 0)
         })
         .sum()
 }
@@ -124,7 +90,7 @@ mod tests {
         let input = include_str!("../example.txt");
         let res = solution(input);
 
-        assert_eq!(res, 0);
+        assert_eq!(res, 21);
     }
 
     #[test]
@@ -132,6 +98,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 0);
+        assert_eq!(res, 7771);
     }
 }
