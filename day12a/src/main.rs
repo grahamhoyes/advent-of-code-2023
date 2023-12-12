@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+type Memo<'a> = HashMap<(&'a str, &'a [usize], usize), usize>;
+
 /// Recursively count the number of possible arrangements for pattern
 /// of observed hot springs with unknowns and known run lengths of the correct
 /// observations.
@@ -5,7 +9,16 @@
 ///     `pattern`: A string array of '.', '?', and '#'
 ///     `runs`: An array of numbers storing the correct length of each '#' run
 ///     `current_run_count`: The number of '#' that immediately precede the pattern
-fn num_arrangements(pattern: &str, runs: &[usize], current_run_count: usize) -> usize {
+fn num_arrangements<'a>(
+    pattern: &'a str,
+    runs: &'a [usize],
+    current_run_count: usize,
+    memo: &mut Memo<'a>,
+) -> usize {
+    if let Some(cached) = memo.get(&(pattern, runs, current_run_count)) {
+        return *cached;
+    }
+
     if pattern.is_empty() {
         #[allow(clippy::if_same_then_else)]
         return if runs.len() == 1 && runs[0] == current_run_count {
@@ -34,21 +47,21 @@ fn num_arrangements(pattern: &str, runs: &[usize], current_run_count: usize) -> 
         [current, ' ']
     };
 
-    values_to_check
+    let possibilities = values_to_check
         .iter()
         .map(|c| {
             match c {
-                '#' => num_arrangements(rest, runs, current_run_count + 1),
+                '#' => num_arrangements(rest, runs, current_run_count + 1, memo),
                 '.' => {
                     let first_run = runs.first();
 
                     if first_run.map_or(false, |length| current_run_count == *length) {
                         // We finished observing a run of broken hot springs and it matched
                         // what we expected, so is valid.
-                        num_arrangements(rest, runs.get(1..).unwrap(), 0)
+                        num_arrangements(rest, runs.get(1..).unwrap(), 0, memo)
                     } else if current_run_count == 0 {
                         // Haven't started tracking a run yet, move along
-                        num_arrangements(rest, runs, 0)
+                        num_arrangements(rest, runs, 0, memo)
                     } else {
                         // We have finished observing a run, but it's length wasn't
                         // compatible with the known run lengths. Invalid path.
@@ -58,10 +71,16 @@ fn num_arrangements(pattern: &str, runs: &[usize], current_run_count: usize) -> 
                 _ => 0,
             }
         })
-        .sum()
+        .sum();
+
+    memo.insert((pattern, runs, current_run_count), possibilities);
+
+    possibilities
 }
 
 fn solution(input: &str) -> usize {
+    let mut memo: Memo = HashMap::new();
+
     input
         .lines()
         .map(|l| {
@@ -69,8 +88,13 @@ fn solution(input: &str) -> usize {
 
             let runs: Vec<usize> = runs.split(',').map(|x| x.parse().unwrap()).collect();
 
-            num_arrangements(pattern, &runs, 0)
+            (pattern.to_string(), runs)
         })
+        // This collect to a heap-allocated vector is required so that pattern and runs
+        // live long enough through the map to be used as memo keys
+        .collect::<Vec<_>>()
+        .iter()
+        .map(|(pattern, runs)| num_arrangements(pattern.as_str(), runs.as_slice(), 0, &mut memo))
         .sum()
 }
 
