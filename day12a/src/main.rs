@@ -9,16 +9,10 @@
 ///
 /// We pass `current` as a separate parameter from `pattern` to make recursive checking easier,
 /// without needing to allocate new strings.
-fn num_arrangements(
-    pattern: Option<&str>,
-    runs: Option<&[usize]>,
-    current_run_count: usize,
-) -> usize {
+fn num_arrangements(pattern: Option<&str>, runs: &[usize], current_run_count: usize) -> usize {
     if pattern.is_none() || pattern.unwrap().is_empty() {
-        return if (runs.is_some()
-            && runs.unwrap().len() == 1
-            && runs.unwrap()[0] == current_run_count)
-            || (runs.is_none() || runs.unwrap().is_empty())
+        return if (runs.len() == 1 && runs[0] == current_run_count)
+            || (runs.is_empty() && current_run_count == 0)
         {
             1
         } else {
@@ -27,11 +21,6 @@ fn num_arrangements(
             0
         };
     }
-    // else if runs.is_none() || runs.unwrap().is_empty() {
-    //     // Not a valid base case, we might run out of runs before the rest of the
-    //     // pattern has been validated
-    //     return 0;
-    // }
 
     let pattern = pattern.unwrap();
 
@@ -47,21 +36,13 @@ fn num_arrangements(
         [current, ' ']
     };
 
-    values_to_check
+    let foo = values_to_check
         .iter()
         .map(|c| {
-            println!(
-                "{}{}{}",
-                (0..10 - rest.map_or(0, |r| r.len()))
-                    .map(|_| ' ')
-                    .collect::<String>(),
-                c,
-                rest.map_or("", |x| x)
-            );
-            match c {
+            let foo = match c {
                 '#' => num_arrangements(rest, runs, current_run_count + 1),
                 '.' => {
-                    let first_run = runs.and_then(|r| r.first());
+                    let first_run = runs.first();
 
                     // if current_run_count > 0 && first_run.is_none() {
                     //     // We are tracking a run of broken hot springs, but expect no more
@@ -70,7 +51,7 @@ fn num_arrangements(
                     if first_run.map_or(false, |length| current_run_count == *length) {
                         // We finished observing a run of broken hot springs and it matched
                         // what we expected, so is valid.
-                        num_arrangements(rest, runs.unwrap().get(1..), 0)
+                        num_arrangements(rest, runs.get(1..).unwrap(), 0)
                     } else if current_run_count == 0 {
                         // Haven't started tracking a run yet, move along
                         num_arrangements(rest, runs, 0)
@@ -81,9 +62,34 @@ fn num_arrangements(
                     }
                 }
                 _ => 0,
-            }
+            };
+
+            // println!(
+            //     "{}{}{} | Runs: {:?} | {}",
+            //     (0..5 - rest.map_or(0, |r| r.len()))
+            //         .map(|_| ' ')
+            //         .collect::<String>(),
+            //     c,
+            //     rest.map_or("", |x| x),
+            //     runs,
+            //     foo
+            // );
+
+            foo
         })
-        .sum()
+        .sum();
+
+    // println!(
+    //     "{}{} | Runs: {:?} | {}",
+    //     (0..5 - rest.map_or(0, |r| r.len()))
+    //         .map(|_| ' ')
+    //         .collect::<String>(),
+    //     pattern,
+    //     runs,
+    //     foo
+    // );
+
+    foo
 }
 
 fn solution(input: &str) -> usize {
@@ -94,16 +100,16 @@ fn solution(input: &str) -> usize {
 
             let runs: Vec<usize> = runs.split(',').map(|x| x.parse().unwrap()).collect();
 
-            let arrangements = num_arrangements(Some(pattern), Some(&runs), 0);
+            let arrangements = num_arrangements(Some(pattern), &runs, 0);
 
-            println!("{}: {}", pattern, arrangements);
+            // println!("{}: {}", pattern, arrangements);
             arrangements
         })
         .sum()
 }
 
 fn main() {
-    let input = include_str!("../example.txt");
+    let input = include_str!("../input.txt");
     let res = solution(input);
 
     println!("Result: {}", res);
