@@ -2,15 +2,22 @@
 /// number of elements to the left of the axis of symmetry.
 ///
 /// To detect a left offset, reverse the input.
-fn detect_offset_palindrome(items: &[usize]) -> Option<usize> {
+fn detect_offset_palindrome(
+    items: &[usize],
+    allow_smudges: bool,
+    ignore_num: usize,
+) -> Option<usize> {
+    // How many smudges we can use
+    let mut smudge_count = if allow_smudges { 1 } else { 0 };
+
     // An offset palindrome will always reach the end of one side
     // of the array, so start there until we find a match
 
     let mut i_start = 0;
     let mut j = items.len() - 1;
 
-    // Advance the left pointer until it matches the last element
-    while items[i_start] != items[j] && i_start < j {
+    // Advance the left pointer until it matches the last element (maybe smudged)
+    while (items[i_start] ^ items[j]).count_ones() > smudge_count && i_start < j {
         i_start += 1;
     }
 
@@ -19,16 +26,14 @@ fn detect_offset_palindrome(items: &[usize]) -> Option<usize> {
         return None;
     }
 
-    // There is a case where the left side happened to match the end,
-    // but not because it's in the palindrome. For example:
-    //   3 2 3 2 1 1 2 3
-    // The left 3 2 aren't part of the palindrome, so we need to
-    // progressively ignore them.
-
     while i_start < j {
         let mut i = i_start;
 
-        while items[i] == items[j] && i < j {
+        while (items[i] ^ items[j]).count_ones() <= smudge_count && i < j {
+            if (items[i] ^ items[j]).count_ones() == 1 {
+                smudge_count = 0
+            }
+
             i += 1;
             j -= 1;
         }
@@ -36,27 +41,32 @@ fn detect_offset_palindrome(items: &[usize]) -> Option<usize> {
         // This problem in particular is for even number palindromes - the
         // axis of symmetry must be between two elements, not on one. For a
         // normal palindrome, this should be i >= j.
-        if i > j {
+        if i > j && (!allow_smudges || (ignore_num == 0 || i != ignore_num)) {
             return Some(i);
         }
 
         // Start the search again, from one more element further from the left
         j = items.len() - 1;
         i_start += 1;
+        smudge_count = if allow_smudges { 1 } else { 0 }
     }
 
     None
 }
 
+#[derive(Eq, PartialEq, Debug)]
+enum DetectedBy {
+    Rows,
+    RowsReversed,
+    Cols,
+    ColsReversed,
+}
+
 fn solution(input: &str) -> usize {
-    // We basically need an offset palindrome recognizer. To make it easier,
-    // we start by treating each row/column as a binary sequence and converting each
-    // to an integer to make later processing easier. This works as long as the
-    // inputs are less than 64 wide/tall - any other hashing function would be fine too.
     input
         .split("\n\n")
         .map(|block| {
-            // Hash each row / column into an integer
+            // Hash each row / column into an integer by treating it as a binary sequence
 
             let rows: Vec<usize> = block
                 .lines()
@@ -84,21 +94,51 @@ fn solution(input: &str) -> usize {
         .map(|(rows, cols)| {
             // Detect palindromes. detect_offset_palindrome only detects right-offset palindromes,
             // so the input is reversed to check for left offsets.
+            let rows_reversed: Vec<_> = rows.iter().rev().cloned().collect();
+            let cols_reversed: Vec<_> = cols.iter().rev().cloned().collect();
 
-            if let Some(num) = detect_offset_palindrome(&rows) {
-                num * 100
-            } else if let Some(num) =
-                detect_offset_palindrome(&rows.iter().rev().cloned().collect::<Vec<_>>())
-            {
-                (rows.len() - num) * 100
-            } else if let Some(num) = detect_offset_palindrome(&cols) {
-                num
-            } else if let Some(num) =
-                detect_offset_palindrome(&cols.iter().rev().cloned().collect::<Vec<_>>())
-            {
-                cols.len() - num
-            } else {
-                unreachable!("Failed to detect any palindrome");
+            let to_check = [
+                (&rows, DetectedBy::Rows),
+                (&rows_reversed, DetectedBy::RowsReversed),
+                (&cols, DetectedBy::Cols),
+                (&cols_reversed, DetectedBy::ColsReversed),
+            ];
+
+            // Find the smudgeless reflection line
+            let mut check_iter = to_check.iter();
+            let (smudgeless_reflection, smudgeless_detected_by) = loop {
+                let (data, detected_by) =
+                    check_iter.next().expect("Failed to detect any palindrome");
+
+                if let Some(num) = detect_offset_palindrome(data, false, 0) {
+                    break (num, detected_by);
+                }
+            };
+
+            // Find the smudged reflection by, which should be a different value from above
+            let mut check_iter = to_check.iter();
+            loop {
+                let (data, detected_by) =
+                    check_iter.next().expect("Failed to detect any palindrome");
+
+                let value_to_ignore = if detected_by == smudgeless_detected_by {
+                    smudgeless_reflection
+                } else {
+                    0
+                };
+
+                if let Some(num) = detect_offset_palindrome(data, true, value_to_ignore) {
+                    if detected_by == smudgeless_detected_by && num == smudgeless_reflection {
+                        continue;
+                    }
+
+                    break match detected_by {
+                        DetectedBy::Rows => num * 100,
+                        DetectedBy::RowsReversed => (data.len() - num) * 100,
+                        DetectedBy::Cols => num,
+                        DetectedBy::ColsReversed => data.len() - num,
+                    };
+                }
             }
         })
         .sum()
@@ -120,13 +160,13 @@ mod tests {
         let input = include_str!("../example.txt");
         let res = solution(input);
 
-        assert_eq!(res, 405);
+        assert_eq!(res, 400);
     }
 
     #[test]
     fn test_normal_palindrome() {
         let a = [3, 2, 2, 3];
-        let res = detect_offset_palindrome(&a);
+        let res = detect_offset_palindrome(&a, false, 0);
 
         assert_eq!(res, Some(2));
     }
@@ -134,7 +174,7 @@ mod tests {
     #[test]
     fn test_offset_palindrome() {
         let a = [3, 2, 3, 2, 2, 3];
-        let res = detect_offset_palindrome(&a);
+        let res = detect_offset_palindrome(&a, false, 0);
 
         assert_eq!(res, Some(4));
     }
@@ -142,7 +182,7 @@ mod tests {
     #[test]
     fn test_no_palindrome() {
         let a = [3, 2, 3, 2, 3];
-        let res = detect_offset_palindrome(&a);
+        let res = detect_offset_palindrome(&a, false, 0);
 
         assert_eq!(res, None);
     }
@@ -152,6 +192,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 30705);
+        assert_eq!(res, 44615);
     }
 }
