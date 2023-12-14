@@ -1,4 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 enum Dir {
@@ -16,8 +17,8 @@ fn rotate(board: &mut Board, dir: Dir) {
     let cols = board[0].len();
 
     let row_iter: I = match dir {
-        Dir::North | Dir::West | Dir::East => Box::new(0..rows),
         Dir::South => Box::new((0..rows).rev()),
+        _ => Box::new(0..rows),
     };
 
     for i in row_iter {
@@ -63,38 +64,51 @@ fn rotate(board: &mut Board, dir: Dir) {
     }
 }
 
+fn rotate_cycle(board: &mut Board) {
+    rotate(board, Dir::North);
+    rotate(board, Dir::West);
+    rotate(board, Dir::South);
+    rotate(board, Dir::East);
+}
+
 fn hash_board(board: &Board) -> u64 {
     let mut hasher = DefaultHasher::new();
     board.hash(&mut hasher);
     hasher.finish()
 }
 
+const ITERATIONS: usize = 1_000_000_000;
+
 fn solution(input: &str) -> usize {
     let mut board: Board = input.lines().map(|l| l.chars().collect()).collect();
 
-    let mut hash = hash_board(&board);
+    // Map of hash to the last iteration we saw it in, used to detect
+    // cycles.
+    let mut hash_states: HashMap<u64, usize> = HashMap::new();
 
-    for i in 0..1_000_000_000 {
-        if i % 1000000 == 0 {
-            println!("{}", i);
-        }
+    let mut i = 0;
+    let mut cycle_length = usize::MAX;
 
-        rotate(&mut board, Dir::North);
-        rotate(&mut board, Dir::West);
-        rotate(&mut board, Dir::South);
-        rotate(&mut board, Dir::East);
+    while i < ITERATIONS - 1 {
+        rotate_cycle(&mut board);
 
-        let new_hash = hash_board(&board);
+        let hash = hash_board(&board);
 
-        if new_hash == hash {
+        if let Some(state) = hash_states.get(&hash) {
+            cycle_length = i - state;
             break;
-        } else {
-            hash = new_hash;
         }
+
+        hash_states.insert(hash, i);
+        i += 1;
     }
 
-    for row in board.iter() {
-        println!("{}", row.iter().collect::<String>());
+    // Jump ahead past all the cycles, then perform the last few
+    // iterations
+    i += ((ITERATIONS - i) / cycle_length) * cycle_length;
+    while i < ITERATIONS - 1 {
+        rotate_cycle(&mut board);
+        i += 1;
     }
 
     board
@@ -106,7 +120,7 @@ fn solution(input: &str) -> usize {
 }
 
 fn main() {
-    let input = include_str!("../example.txt");
+    let input = include_str!("../input.txt");
     let res = solution(input);
 
     println!("Result: {}", res);
@@ -129,6 +143,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 105249);
+        assert_eq!(res, 88680);
     }
 }
