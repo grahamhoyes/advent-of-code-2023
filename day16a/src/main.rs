@@ -108,13 +108,7 @@ fn solution(input: &str) -> usize {
         while let Some(char) = board.get(&coord) {
             let key = (coord, dir);
             if illuminated.contains(&key) {
-                if let Some(next) = beams.pop() {
-                    (coord, dir) = next;
-                    continue;
-                } else {
-                    // All done
-                    break;
-                }
+                break;
             } else {
                 illuminated.insert(key);
             }

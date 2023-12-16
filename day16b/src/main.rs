@@ -110,13 +110,7 @@ fn illuminate_board(board: &Board, start: Coord, start_dir: Dir) -> usize {
         while let Some(char) = board.get(&coord) {
             let key = (coord, dir);
             if illuminated.contains(&key) {
-                if let Some(next) = beams.pop() {
-                    (coord, dir) = next;
-                    continue;
-                } else {
-                    // All done
-                    break;
-                }
+                break;
             } else {
                 illuminated.insert(key);
             }
