@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::ops::Add;
 
 // There are a lot of similarities between these types and what we did in day 10
+
 struct Board {
     inner: Vec<Vec<char>>,
 }
@@ -11,6 +12,11 @@ impl Board {
         Self {
             inner: input.lines().map(|l| l.chars().collect()).collect(),
         }
+    }
+
+    /// Return the number of rows and columns in the board
+    fn size(&self) -> (usize, usize) {
+        (self.inner.len(), self.inner[0].len())
     }
 
     fn get(&self, c: &Coord) -> Option<char> {
@@ -91,6 +97,7 @@ fn wait() {
     stdin().read_line(&mut String::new()).unwrap();
 }
 
+/// Send a beam through the board, returning the number of cells it illuminates
 fn illuminate_board(board: &Board, start: Coord, start_dir: Dir) -> usize {
     // Set of coordinates and directions of illuminated cells, used to detect
     // loops.
@@ -99,10 +106,7 @@ fn illuminate_board(board: &Board, start: Coord, start_dir: Dir) -> usize {
     // Forked beams we have to keep track of, from their starting coordinate and direction
     let mut beams: Vec<(Coord, Dir)> = vec![(start, start_dir)];
 
-    while let Some((start, dir_start)) = beams.pop() {
-        let mut coord = start;
-        let mut dir = dir_start;
-
+    while let Some((mut coord, mut dir)) = beams.pop() {
         while let Some(char) = board.get(&coord) {
             let key = (coord, dir);
             if illuminated.contains(&key) {
@@ -121,7 +125,7 @@ fn illuminate_board(board: &Board, start: Coord, start_dir: Dir) -> usize {
             {
                 board.print_at(&coord, &dir);
                 println!("Beams: {:?}", beams);
-                crate::wait();
+                wait();
             }
 
             // dir is the direction we're going, not the direction we're coming from
@@ -164,7 +168,29 @@ fn illuminate_board(board: &Board, start: Coord, start_dir: Dir) -> usize {
 fn solution(input: &str) -> usize {
     let board = Board::from_input(input);
 
-    illuminate_board(&board, Coord(0, 0), Dir::East)
+    let mut scores: Vec<usize> = Vec::new();
+
+    let (rows, cols) = board.size();
+
+    for i in 0..rows {
+        scores.push(illuminate_board(&board, Coord(i as i32, 0), Dir::East));
+        scores.push(illuminate_board(
+            &board,
+            Coord(i as i32, cols as i32 - 1),
+            Dir::West,
+        ));
+    }
+
+    for j in 0..cols {
+        scores.push(illuminate_board(&board, Coord(0, j as i32), Dir::South));
+        scores.push(illuminate_board(
+            &board,
+            Coord(rows as i32 - 1, j as i32),
+            Dir::North,
+        ));
+    }
+
+    *scores.iter().max().unwrap()
 }
 
 fn main() {
@@ -187,7 +213,7 @@ mod tests {
         let input = include_str!("../example.txt");
         let res = solution(input);
 
-        assert_eq!(res, 46);
+        assert_eq!(res, 51);
     }
 
     #[test]
@@ -195,6 +221,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 7199);
+        assert_eq!(res, 7438);
     }
 }
