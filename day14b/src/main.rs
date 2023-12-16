@@ -89,7 +89,7 @@ fn solution(input: &str) -> usize {
     let mut i = 0;
     let mut cycle_length = usize::MAX;
 
-    while i < ITERATIONS - 1 {
+    while i < ITERATIONS {
         rotate_cycle(&mut board);
 
         let hash = hash_board(&board);
@@ -105,8 +105,8 @@ fn solution(input: &str) -> usize {
 
     // Jump ahead past all the cycles, then perform the last few
     // iterations
-    i += ((ITERATIONS - i) / cycle_length) * cycle_length;
-    while i < ITERATIONS - 1 {
+    i += ((ITERATIONS - i) / cycle_length) * cycle_length + 1;
+    while i < ITERATIONS {
         rotate_cycle(&mut board);
         i += 1;
     }
