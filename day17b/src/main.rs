@@ -81,7 +81,7 @@ impl PartialOrd for Visit {
     }
 }
 
-fn solution(input: &str) -> usize {
+fn solution(input: &str, min_straight: usize, max_straight: usize) -> usize {
     let board = Board::from_input(input);
 
     let (rows, cols) = board.size();
@@ -127,7 +127,11 @@ fn solution(input: &str) -> usize {
 
             // Rather than letting us travel straight as a separate iteration,
             // enqueue all of the legal straight moves after going in new_direction at once.
-            for steps in 1..=3 {
+            // Part 2: We still have to go through (1..min_straight) to count the cost
+            // of those cells, but we won't allow enqueuing from there.
+            for steps in 1..=max_straight {
+                let steps = steps as i32; // Since we use i32 for coords
+
                 let c = match new_direction {
                     Dir::North => Coord(y - steps, x),
                     Dir::East => Coord(y, x + steps),
@@ -137,6 +141,10 @@ fn solution(input: &str) -> usize {
 
                 if let Some(extra_cost) = board.get(&c) {
                     new_cost += extra_cost;
+
+                    if (steps as usize) < min_straight {
+                        continue;
+                    }
 
                     let is_cheaper = costs
                         .get(&(c, new_direction))
@@ -160,7 +168,7 @@ fn solution(input: &str) -> usize {
 
 fn main() {
     let input = include_str!("../input.txt");
-    let res = solution(input);
+    let res = solution(input, 4, 10);
 
     println!("Result: {}", res);
 }
@@ -172,16 +180,16 @@ mod tests {
     #[test]
     fn test_example() {
         let input = include_str!("../example.txt");
-        let res = solution(input);
+        let res = solution(input, 4, 10);
 
-        assert_eq!(res, 102);
+        assert_eq!(res, 94);
     }
 
     #[test]
     fn test_input() {
         let input = include_str!("../input.txt");
-        let res = solution(input);
+        let res = solution(input, 4, 10);
 
-        assert_eq!(res, 1128);
+        assert_eq!(res, 1268);
     }
 }
