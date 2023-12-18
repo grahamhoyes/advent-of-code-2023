@@ -17,18 +17,6 @@ enum Dir {
     West,
 }
 
-impl From<&str> for Dir {
-    fn from(value: &str) -> Self {
-        match value {
-            "U" => Self::North,
-            "R" => Self::East,
-            "D" => Self::South,
-            "L" => Self::West,
-            v => panic!("Unrecognized direction {}", v),
-        }
-    }
-}
-
 impl Add<Dir> for Coord {
     type Output = Coord;
 
@@ -92,11 +80,20 @@ fn solution(input: &str) -> u64 {
     let directions: Vec<SteppedDir> = input
         .lines()
         .map(|l| {
+            // Only change from part 1 is in the parsing logic here
             let mut parts = l.split(' ');
-            let dir = parts.next().unwrap();
-            let step = parts.next().unwrap().parse::<usize>().unwrap();
+            let data = parts.nth(2).unwrap();
 
-            Dir::from(dir) * step
+            let step = usize::from_str_radix(&data[2..=6], 16).unwrap();
+            let dir = match &data[7..=7] {
+                "0" => Dir::East,
+                "1" => Dir::South,
+                "2" => Dir::West,
+                "3" => Dir::North,
+                d => panic!("Unrecognized direction {d}"),
+            };
+
+            dir * step
         })
         .collect();
 
@@ -155,7 +152,7 @@ mod tests {
         let input = include_str!("../example.txt");
         let res = solution(input);
 
-        assert_eq!(res, 62);
+        assert_eq!(res, 952408144115);
     }
 
     #[test]
@@ -163,6 +160,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 36679);
+        assert_eq!(res, 88007104020978);
     }
 }
