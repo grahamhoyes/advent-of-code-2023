@@ -40,20 +40,20 @@ impl Condition {
 
 #[derive(Debug)]
 enum Rule {
-    Conditional {
-        category: String,
-        condition: Condition,
-        dest: Dest,
-    },
+    Conditional { condition: Condition, dest: Dest },
     Unconditional(Dest),
 }
 
-// Do some stuff. Return the rule streams that lead to an accept condition.
-fn parse_rule_stream(
+/// Find the conditions that result in a part being accepted.
+///
+/// Conjunctions (ANDs) of conditions needed to accept a part are added to
+/// accepted_runs when one is found. accepted_runs as a whole is a disjunction (OR)
+/// of acceptable conditions.
+fn find_accept_conditions(
     workflows: &HashMap<String, Vec<Rule>>,
     start: &str,
     mut this_run: Vec<Condition>,
-    all_runs: &mut Vec<Vec<Condition>>,
+    accepted_runs: &mut Vec<Vec<Condition>>,
 ) {
     let flow = &workflows[start];
 
@@ -61,49 +61,41 @@ fn parse_rule_stream(
 
     for rule in flow {
         match rule {
-            Rule::Unconditional(dest) => match dest {
+            Rule::Unconditional(dest) => {
                 // Unconditional rules are always the end of a rule set,
                 // so these must all return
-                Dest::Accept => {
-                    // When we hit an accept, save the history that led here
-                    this_run.extend_from_slice(&conditions);
-                    all_runs.push(this_run);
-                    return;
-                }
-                Dest::Reject => {
-                    // When we hit a reject, discard the history
-                    return;
-                }
-                Dest::Goto(f) => {
-                    // When we hit a fork, clone the history so far and proceed
-                    // with that
-                    this_run.extend_from_slice(&conditions);
-                    parse_rule_stream(workflows, f, this_run, all_runs);
-                    return;
-                }
-            },
-            Rule::Conditional {
-                condition,
-                category,
-                dest,
-            } => {
-                // Fork on the condition
                 match dest {
                     Dest::Accept => {
-                        conditions.push(condition.clone());
+                        // When we hit an accept, save the history that led here
                         this_run.extend_from_slice(&conditions);
-                        all_runs.push(this_run);
-                        return;
+                        accepted_runs.push(this_run);
                     }
                     Dest::Reject => {
-                        return;
+                        // When we hit a reject, discard the history
                     }
                     Dest::Goto(f) => {
-                        let mut forked_run = this_run.clone();
-                        let mut forked_conditions = conditions.clone();
-                        forked_conditions.push(condition.clone());
-                        forked_run.extend_from_slice(&forked_conditions);
-                        parse_rule_stream(workflows, f, forked_run, all_runs);
+                        // When we hit an unconditional goto, add conditions from this
+                        // rule set and proceed from there.
+                        this_run.extend_from_slice(&conditions);
+                        find_accept_conditions(workflows, f, this_run, accepted_runs);
+                    }
+                }
+                return;
+            }
+            Rule::Conditional { condition, dest } => {
+                // Fork on the condition
+                let mut forked_run = this_run.clone();
+                let mut forked_conditions = conditions.clone();
+                forked_conditions.push(condition.clone());
+                forked_run.extend_from_slice(&forked_conditions);
+
+                match dest {
+                    Dest::Accept => {
+                        accepted_runs.push(forked_run);
+                    }
+                    Dest::Reject => {}
+                    Dest::Goto(f) => {
+                        find_accept_conditions(workflows, f, forked_run, accepted_runs);
                     }
                 }
 
@@ -142,7 +134,6 @@ fn solution(input: &str) -> usize {
                         };
 
                         Rule::Conditional {
-                            category: category.clone(),
                             condition: Condition {
                                 key: category,
                                 op,
@@ -171,7 +162,7 @@ fn solution(input: &str) -> usize {
     // calculate their 4D volumes.
     let mut all_runs = Vec::new();
     let this_run = Vec::new();
-    parse_rule_stream(&workflows, "in", this_run, &mut all_runs);
+    find_accept_conditions(&workflows, "in", this_run, &mut all_runs);
 
     for ruleset in all_runs {
         println!("{:?}", ruleset);
