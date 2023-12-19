@@ -2,19 +2,10 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum Op {
     Gt,
     Lt,
-}
-
-impl Op {
-    fn cmp(&self, lhs: &u16, rhs: &u16) -> bool {
-        match self {
-            Op::Gt => lhs > rhs,
-            Op::Lt => lhs < rhs,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -24,52 +15,103 @@ enum Dest {
     Goto(String),
 }
 
+#[derive(Debug, Clone)]
+struct Condition {
+    key: String,
+    op: Op,
+    val: u16,
+}
+
+impl Condition {
+    /// Get the logical complement of this condition
+    fn complement(self) -> Self {
+        let (op, val) = match self.op {
+            Op::Lt => (Op::Gt, self.val - 1),
+            Op::Gt => (Op::Lt, self.val + 1),
+        };
+
+        Self {
+            key: self.key,
+            op,
+            val,
+        }
+    }
+}
+
 #[derive(Debug)]
 enum Rule {
     Conditional {
         category: String,
-        op: Op,
-        val: u16,
+        condition: Condition,
         dest: Dest,
     },
     Unconditional(Dest),
 }
 
-/// Apply workflows until the part is accepted or reject. Returns true if the
-/// part is accepted, otherwise false.
-fn apply_workflows(workflows: &HashMap<String, Vec<Rule>>, part: &HashMap<String, u16>) -> bool {
-    let mut flow = &workflows["in"];
+// Do some stuff. Return the rule streams that lead to an accept condition.
+fn parse_rule_stream(
+    workflows: &HashMap<String, Vec<Rule>>,
+    start: &str,
+    mut this_run: Vec<Condition>,
+    all_runs: &mut Vec<Vec<Condition>>,
+) {
+    let flow = &workflows[start];
 
-    loop {
-        for rule in flow {
-            match rule {
-                Rule::Unconditional(dest) => match dest {
-                    Dest::Accept => return true,
-                    Dest::Reject => return false,
-                    Dest::Goto(f) => {
-                        flow = &workflows[f];
-                        break;
+    let mut conditions: Vec<Condition> = Vec::new();
+
+    for rule in flow {
+        match rule {
+            Rule::Unconditional(dest) => match dest {
+                // Unconditional rules are always the end of a rule set,
+                // so these must all return
+                Dest::Accept => {
+                    // When we hit an accept, save the history that led here
+                    this_run.extend_from_slice(&conditions);
+                    all_runs.push(this_run);
+                    return;
+                }
+                Dest::Reject => {
+                    // When we hit a reject, discard the history
+                    return;
+                }
+                Dest::Goto(f) => {
+                    // When we hit a fork, clone the history so far and proceed
+                    // with that
+                    this_run.extend_from_slice(&conditions);
+                    parse_rule_stream(workflows, f, this_run, all_runs);
+                    return;
+                }
+            },
+            Rule::Conditional {
+                condition,
+                category,
+                dest,
+            } => {
+                // Fork on the condition
+                match dest {
+                    Dest::Accept => {
+                        conditions.push(condition.clone());
+                        this_run.extend_from_slice(&conditions);
+                        all_runs.push(this_run);
+                        return;
                     }
-                },
-                Rule::Conditional {
-                    category,
-                    op,
-                    val,
-                    dest,
-                } => {
-                    if op.cmp(&part[category], val) {
-                        match dest {
-                            Dest::Accept => return true,
-                            Dest::Reject => return false,
-                            Dest::Goto(f) => {
-                                flow = &workflows[f];
-                                break;
-                            }
-                        }
+                    Dest::Reject => {
+                        return;
+                    }
+                    Dest::Goto(f) => {
+                        let mut forked_run = this_run.clone();
+                        let mut forked_conditions = conditions.clone();
+                        forked_conditions.push(condition.clone());
+                        forked_run.extend_from_slice(&forked_conditions);
+                        parse_rule_stream(workflows, f, forked_run, all_runs);
                     }
                 }
+
+                // Rules will never end in a conditional case. We push the complement
+                // of this condition since it must be false to reach the next rule.
+                conditions.push(condition.clone().complement())
             }
-        }
+        };
     }
 }
 
@@ -100,9 +142,12 @@ fn solution(input: &str) -> usize {
                         };
 
                         Rule::Conditional {
-                            category,
-                            op,
-                            val,
+                            category: category.clone(),
+                            condition: Condition {
+                                key: category,
+                                op,
+                                val,
+                            },
                             dest,
                         }
                     } else if rule == "A" {
@@ -119,31 +164,25 @@ fn solution(input: &str) -> usize {
         })
         .collect();
 
-    let mut valid: usize = 0;
+    // Brute forcing doesn't work, there are over 2^47 combinations to check.
+    // The workflows form a tree, starting with the `in` node (let's hope it's
+    // non-cyclic). By doing a depth first search, we can get a list of all
+    // conditions that result in a part being accepted. Build bounded regions,
+    // calculate their 4D volumes.
+    let mut all_runs = Vec::new();
+    let this_run = Vec::new();
+    parse_rule_stream(&workflows, "in", this_run, &mut all_runs);
 
-    for x in 1..=4000 {
-        println!(".");
-        for m in 1..=4000 {
-            for a in 1..=4000 {
-                for s in 1..=4000 {
-                    let part: HashMap<String, u16> = [("x", x), ("m", m), ("a", a), ("s", s)]
-                        .into_iter()
-                        .map(|(key, val)| (key.to_string(), val))
-                        .collect();
-
-                    if apply_workflows(&workflows, &part) {
-                        valid += 1;
-                    }
-                }
-            }
-        }
+    for ruleset in all_runs {
+        println!("{:?}", ruleset);
+        println!();
     }
 
-    valid
+    0
 }
 
 fn main() {
-    let input = include_str!("../input.txt");
+    let input = include_str!("../example.txt");
     let res = solution(input);
 
     println!("Result: {}", res);
