@@ -73,8 +73,8 @@ fn apply_workflows(workflows: &HashMap<String, Vec<Rule>>, part: &HashMap<String
     }
 }
 
-fn solution(input: &str) -> u64 {
-    let (workflows, parts) = input.split_once("\n\n").unwrap();
+fn solution(input: &str) -> usize {
+    let (workflows, _) = input.split_once("\n\n").unwrap();
 
     let workflow_re = Regex::new(r"(?<name>[a-z]+)\{(?<rules>.+)}").unwrap();
     let comp_rule_re =
@@ -119,25 +119,27 @@ fn solution(input: &str) -> u64 {
         })
         .collect();
 
-    let part_re = Regex::new(r"\{x=(?<x>\d+),m=(?<m>\d+),a=(?<a>\d+),s=(?<s>\d+)}").unwrap();
+    let mut valid: usize = 0;
 
-    let parts = parts.lines().map(|part| {
-        let caps = part_re
-            .captures(part)
-            .unwrap_or_else(|| panic!("Invalid part {}", part));
+    for x in 1..=4000 {
+        println!(".");
+        for m in 1..=4000 {
+            for a in 1..=4000 {
+                for s in 1..=4000 {
+                    let part: HashMap<String, u16> = [("x", x), ("m", m), ("a", a), ("s", s)]
+                        .into_iter()
+                        .map(|(key, val)| (key.to_string(), val))
+                        .collect();
 
-        // Convert parts into a hash map of category -> value so that we can
-        // more easily do a dynamic lookup than if it were a struct
-        ["x", "m", "a", "s"]
-            .into_iter()
-            .map(|c| (c.to_string(), caps[c].parse().unwrap()))
-            .collect::<HashMap<String, u16>>()
-    });
+                    if apply_workflows(&workflows, &part) {
+                        valid += 1;
+                    }
+                }
+            }
+        }
+    }
 
-    parts
-        .filter(|part| apply_workflows(&workflows, part))
-        .map(|part| part.values().fold(0u64, |accum, val| accum + *val as u64))
-        .sum()
+    valid
 }
 
 fn main() {
