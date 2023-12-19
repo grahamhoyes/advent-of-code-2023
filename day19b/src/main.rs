@@ -156,62 +156,42 @@ fn solution(input: &str) -> u64 {
         .collect();
 
     // Brute forcing doesn't work, there are over 2^47 combinations to check.
-    // The workflows form a tree, starting with the `in` node (let's hope it's
-    // non-cyclic). By doing a depth first search, we can get a list of all
-    // conditions that result in a part being accepted. Build bounded regions,
-    // calculate their 4D volumes.
+    // The workflows form a tree, starting with the `in` node. Each path to an
+    // Accept leaf node of this tree is a set of rules that, when reduced,
+    // can give lower and upper bounds on each of our four variables. Calculating
+    // the volumes of the 4D hyper-rectangles bound by these bounds gives the
+    // desired answer.
     let mut accepted_runs = Vec::new();
     find_accept_conditions(&workflows, "in", Vec::new(), &mut accepted_runs);
 
-    // for ruleset in accepted_runs.iter() {
-    //     println!("{:?}", ruleset);
-    //     println!();
-    // }
+    // Maps with lower and upper bounds for each category, for each combination
+    // of rules that leads to an accepted state.
+    let regions = accepted_runs.iter().map(|conditions| {
+        // Tuples of inclusive (lower bound, upper bound) for each category
+        let bounds: HashMap<&str, (u16, u16)> = ["x", "m", "a", "s"]
+            .map(|c| (c, (1, 4000)))
+            .into_iter()
+            .collect();
+        conditions.iter().fold(bounds, |mut map, condition| {
+            let bound = map.get_mut(condition.key.as_str()).unwrap();
+            match condition.op {
+                Op::Gt => bound.0 = condition.val + 1,
+                Op::Lt => bound.1 = condition.val - 1,
+            }
 
-    // Each run forms a logically consistent bounded region. Find that
-    let regions = accepted_runs
-        .iter()
-        .map(|conditions| {
-            // Tuples of inclusive (lower bound, upper bound) for each category
-            let bounds: HashMap<&str, (u16, u16)> = ["x", "m", "a", "s"]
-                .map(|c| (c, (1, 4000)))
-                .into_iter()
-                .collect();
-            conditions.iter().fold(bounds, |mut map, condition| {
-                let bound = map.get_mut(condition.key.as_str()).unwrap();
-                match condition.op {
-                    // TODO: +1 and -1?
-                    Op::Gt => bound.0 = condition.val + 1,
-                    Op::Lt => bound.1 = condition.val - 1,
-                }
-
-                map
-            })
+            map
         })
-        .collect::<Vec<_>>();
+    });
 
-    // for region in regions.iter() {
-    //     for (key, (lower, upper)) in region.iter() {
-    //         println!("{}: ({}, {})", key, lower, upper);
-    //     }
-    //     println!();
-    // }
-
-    let volumes = regions
-        .iter()
+    // For each region, compute the 4D volume and sum those up
+    regions
         .map(|region| {
             region
                 .values()
                 .map(|(lower, upper)| (upper - lower + 1) as u64)
                 .product::<u64>()
         })
-        .collect::<Vec<_>>();
-
-    // for volume in volumes.iter() {
-    //     println!("{}", volume);
-    // }
-
-    volumes.iter().sum()
+        .sum()
 }
 
 fn main() {
