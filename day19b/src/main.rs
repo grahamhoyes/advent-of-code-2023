@@ -107,7 +107,7 @@ fn find_accept_conditions(
     }
 }
 
-fn solution(input: &str) -> usize {
+fn solution(input: &str) -> u64 {
     let (workflows, _) = input.split_once("\n\n").unwrap();
 
     let workflow_re = Regex::new(r"(?<name>[a-z]+)\{(?<rules>.+)}").unwrap();
@@ -160,20 +160,62 @@ fn solution(input: &str) -> usize {
     // non-cyclic). By doing a depth first search, we can get a list of all
     // conditions that result in a part being accepted. Build bounded regions,
     // calculate their 4D volumes.
-    let mut all_runs = Vec::new();
-    let this_run = Vec::new();
-    find_accept_conditions(&workflows, "in", this_run, &mut all_runs);
+    let mut accepted_runs = Vec::new();
+    find_accept_conditions(&workflows, "in", Vec::new(), &mut accepted_runs);
 
-    for ruleset in all_runs {
-        println!("{:?}", ruleset);
-        println!();
-    }
+    // for ruleset in accepted_runs.iter() {
+    //     println!("{:?}", ruleset);
+    //     println!();
+    // }
 
-    0
+    // Each run forms a logically consistent bounded region. Find that
+    let regions = accepted_runs
+        .iter()
+        .map(|conditions| {
+            // Tuples of inclusive (lower bound, upper bound) for each category
+            let bounds: HashMap<&str, (u16, u16)> = ["x", "m", "a", "s"]
+                .map(|c| (c, (1, 4000)))
+                .into_iter()
+                .collect();
+            conditions.iter().fold(bounds, |mut map, condition| {
+                let bound = map.get_mut(condition.key.as_str()).unwrap();
+                match condition.op {
+                    // TODO: +1 and -1?
+                    Op::Gt => bound.0 = condition.val + 1,
+                    Op::Lt => bound.1 = condition.val - 1,
+                }
+
+                map
+            })
+        })
+        .collect::<Vec<_>>();
+
+    // for region in regions.iter() {
+    //     for (key, (lower, upper)) in region.iter() {
+    //         println!("{}: ({}, {})", key, lower, upper);
+    //     }
+    //     println!();
+    // }
+
+    let volumes = regions
+        .iter()
+        .map(|region| {
+            region
+                .values()
+                .map(|(lower, upper)| (upper - lower + 1) as u64)
+                .product::<u64>()
+        })
+        .collect::<Vec<_>>();
+
+    // for volume in volumes.iter() {
+    //     println!("{}", volume);
+    // }
+
+    volumes.iter().sum()
 }
 
 fn main() {
-    let input = include_str!("../example.txt");
+    let input = include_str!("../input.txt");
     let res = solution(input);
 
     println!("Result: {}", res);
@@ -188,7 +230,7 @@ mod tests {
         let input = include_str!("../example.txt");
         let res = solution(input);
 
-        assert_eq!(res, 19114);
+        assert_eq!(res, 167409079868000);
     }
 
     #[test]
@@ -196,6 +238,6 @@ mod tests {
         let input = include_str!("../input.txt");
         let res = solution(input);
 
-        assert_eq!(res, 376008);
+        assert_eq!(res, 124078207789312);
     }
 }
