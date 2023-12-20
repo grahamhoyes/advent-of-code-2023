@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 #[derive(Debug, Eq, PartialEq)]
 enum State {
@@ -49,6 +49,7 @@ struct Conjunction {
     memory: HashMap<String, State>,
 }
 
+// An active-low AND gate
 impl Conjunction {
     fn new(outputs: Vec<String>) -> Self {
         Self {
@@ -83,6 +84,25 @@ impl Conjunction {
 }
 
 #[derive(Debug)]
+struct Output {
+    // An output is enabled when it has been sent a low pulse
+    enabled: bool,
+}
+
+impl Output {
+    fn new() -> Self {
+        Self { enabled: false }
+    }
+
+    fn process(&mut self, input: Pulse) {
+        if let Pulse::Low = input {
+            println!("Output got a low pulse");
+            self.enabled = true;
+        }
+    }
+}
+
+#[derive(Debug)]
 enum Module {
     FlipFlop(FlipFlop),
     Conjunction(Conjunction),
@@ -91,7 +111,18 @@ enum Module {
         outputs: Vec<String>,
     },
     /// Outputs are the end of a chain
-    Output,
+    Output(Output),
+}
+
+impl Module {
+    /// Return the contained output variant, panicking if this is
+    /// not an output
+    fn output(&self) -> &Output {
+        match self {
+            Module::Output(o) => o,
+            _ => panic!("Not an output"),
+        }
+    }
 }
 
 fn load_modules(input: &str) -> HashMap<String, Module> {
@@ -128,7 +159,7 @@ fn load_modules(input: &str) -> HashMap<String, Module> {
         {
             for o in outputs {
                 if !modules.contains_key(o) {
-                    new_outputs.push((o.clone(), Module::Output));
+                    new_outputs.push((o.clone(), Module::Output(Output::new())));
                 }
                 module_inputs
                     .entry(o.clone())
@@ -153,98 +184,62 @@ fn load_modules(input: &str) -> HashMap<String, Module> {
     modules
 }
 
-/// Simulate a button press on the modules. Returns the number of low and
-/// high pulses that were sent.
-fn simulate_button_press(modules: &mut HashMap<String, Module>) -> (usize, usize) {
-    let mut pulses_sent = (1, 0); // The button press is one low pulse
+fn print_mermaid_diagram(modules: &HashMap<String, Module>) {
+    println!("flowchart TB");
+    println!("    broadcaster[[broadcaster]]");
 
-    // Tuples of (from, to, pulse)
-    let mut signals: VecDeque<(String, String, Pulse)> = VecDeque::new();
+    let mut cons = Vec::new();
+    let mut flops = Vec::new();
+    let mut connections = Vec::new();
 
-    // The button press sends a low signal through the broadcaster
-    if let Module::Broadcaster { outputs } = modules.get("broadcaster").unwrap() {
-        for output in outputs {
-            signals.push_back(("broadcaster".to_string(), output.clone(), Pulse::Low));
-            pulses_sent.0 += 1
-        }
-    } else {
-        panic!("Failed to find broadcaster module");
-    }
-
-    while let Some((source, dest, pulse)) = signals.pop_front() {
-        if let Some((outputs, pulse)) = match modules.get_mut(&dest).unwrap() {
-            Module::FlipFlop(f) => Some((f.outputs.clone(), f.process(pulse))),
-            Module::Conjunction(c) => Some((c.outputs.clone(), c.process(&source, pulse))),
-            _ => None,
-        } {
-            if matches!(pulse, Pulse::None) {
-                continue;
-            }
-
-            for output in outputs {
-                signals.push_back((dest.clone(), output, pulse));
-
-                match pulse {
-                    Pulse::Low => pulses_sent.0 += 1,
-                    Pulse::High => pulses_sent.1 += 1,
-                    _ => unreachable!(),
+    for (name, module) in modules.iter() {
+        match module {
+            Module::FlipFlop(f) => {
+                flops.push((name, f));
+                for o in f.outputs.iter() {
+                    connections.push(format!("    {}-->{}", name, o));
                 }
             }
+            Module::Conjunction(c) => {
+                cons.push((name, c));
+                for o in c.outputs.iter() {
+                    connections.push(format!("    {}-->{}", name, o));
+                }
+            }
+            Module::Broadcaster { outputs } => {
+                for o in outputs {
+                    connections.push(format!("    {}-->{}", name, o));
+                }
+            }
+            _ => {}
         }
     }
 
-    pulses_sent
-}
+    // Use a stable order for outputting the nodes so that the diagram
+    // is consistent.
+    cons.sort_by_key(|(name, _)| *name);
+    flops.sort_by_key(|(name, _)| *name);
 
-fn solution(input: &str) -> usize {
-    let mut modules = load_modules(input);
-
-    let mut low_sent = 0;
-    let mut high_sent = 0;
-
-    // We could detect loops when processing and jump through most of this,
-    // but this is basically instant anyway.
-    for _ in 0..1000 {
-        let (low, high) = simulate_button_press(&mut modules);
-        low_sent += low;
-        high_sent += high;
+    for (name, _) in cons.iter() {
+        println!("    {}([&{}])", name, name);
     }
 
-    low_sent * high_sent
+    for (name, _) in flops.iter() {
+        // Lots of braces needed to escape double braces in the output
+        println!("    {}{{{{%{}}}}}", name, name);
+    }
+
+    println!("    rx[[rx]]");
+
+    // With the nodes in the right places, print the connections
+    for c in connections {
+        println!("{}", c);
+    }
 }
 
+/// No computed solution for this part, see the readme for a proof by inspection.
 fn main() {
     let input = include_str!("../input.txt");
-    let res = solution(input);
-
-    println!("Result: {}", res);
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_example_1() {
-        let input = include_str!("../example_1.txt");
-        let res = solution(input);
-
-        assert_eq!(res, 32000000);
-    }
-
-    #[test]
-    fn test_example_2() {
-        let input = include_str!("../example_2.txt");
-        let res = solution(input);
-
-        assert_eq!(res, 11687500);
-    }
-
-    #[test]
-    fn test_input() {
-        let input = include_str!("../input.txt");
-        let res = solution(input);
-
-        assert_eq!(res, 818649769);
-    }
+    let modules = load_modules(input);
+    print_mermaid_diagram(&modules);
 }
