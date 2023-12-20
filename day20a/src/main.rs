@@ -15,15 +15,13 @@ enum Pulse {
 
 #[derive(Debug)]
 struct FlipFlop {
-    name: String,
     outputs: Vec<String>,
     state: State,
 }
 
 impl FlipFlop {
-    fn new(name: String, outputs: Vec<String>) -> Self {
+    fn new(outputs: Vec<String>) -> Self {
         Self {
-            name,
             outputs,
             state: State::Off,
         }
@@ -47,15 +45,13 @@ impl FlipFlop {
 
 #[derive(Debug)]
 struct Conjunction {
-    name: String,
     outputs: Vec<String>,
     memory: HashMap<String, State>,
 }
 
 impl Conjunction {
-    fn new(name: String, outputs: Vec<String>) -> Self {
+    fn new(outputs: Vec<String>) -> Self {
         Self {
-            name,
             outputs,
             memory: HashMap::new(),
         }
@@ -106,14 +102,11 @@ fn load_modules(input: &str) -> HashMap<String, Module> {
         let outputs: Vec<String> = outputs.split(", ").map(String::from).collect();
 
         if let Some(name) = name.strip_prefix('%') {
-            modules.insert(
-                name.to_string(),
-                Module::FlipFlop(FlipFlop::new(name.to_string(), outputs)),
-            );
+            modules.insert(name.to_string(), Module::FlipFlop(FlipFlop::new(outputs)));
         } else if let Some(name) = name.strip_prefix('&') {
             modules.insert(
                 name.to_string(),
-                Module::Conjunction(Conjunction::new(name.to_string(), outputs)),
+                Module::Conjunction(Conjunction::new(outputs)),
             );
         } else if name == "broadcaster" {
             modules.insert(name.to_string(), Module::Broadcaster { outputs });
@@ -160,8 +153,8 @@ fn load_modules(input: &str) -> HashMap<String, Module> {
     modules
 }
 
-/// Simulate a button press on the modules. Returns the number
-/// of low and high pulses that were sent.
+/// Simulate a button press on the modules. Returns the number of low and
+/// high pulses that were sent.
 fn simulate_button_press(modules: &mut HashMap<String, Module>) -> (usize, usize) {
     let mut pulses_sent = (1, 0); // The button press is one low pulse
 
@@ -179,40 +172,24 @@ fn simulate_button_press(modules: &mut HashMap<String, Module>) -> (usize, usize
     }
 
     while let Some((source, dest, pulse)) = signals.pop_front() {
-        match modules.get_mut(&dest).unwrap() {
-            Module::FlipFlop(f) => match f.process(pulse) {
-                Pulse::None => continue,
-                Pulse::Low => {
-                    for output in f.outputs.iter() {
-                        // The destination of this signal is the source of the next one
-                        signals.push_back((dest.clone(), output.clone(), Pulse::Low));
-                        pulses_sent.0 += 1;
-                    }
+        if let Some((outputs, pulse)) = match modules.get_mut(&dest).unwrap() {
+            Module::FlipFlop(f) => Some((f.outputs.clone(), f.process(pulse))),
+            Module::Conjunction(c) => Some((c.outputs.clone(), c.process(&source, pulse))),
+            _ => None,
+        } {
+            if matches!(pulse, Pulse::None) {
+                continue;
+            }
+
+            for output in outputs {
+                signals.push_back((dest.clone(), output, pulse));
+
+                match pulse {
+                    Pulse::Low => pulses_sent.0 += 1,
+                    Pulse::High => pulses_sent.1 += 1,
+                    _ => unreachable!(),
                 }
-                Pulse::High => {
-                    for output in f.outputs.iter() {
-                        // The destination of this signal is the source of the next one
-                        signals.push_back((dest.clone(), output.clone(), Pulse::High));
-                        pulses_sent.1 += 1;
-                    }
-                }
-            },
-            Module::Conjunction(c) => match c.process(&source, pulse) {
-                Pulse::None => continue,
-                Pulse::Low => {
-                    for output in c.outputs.iter() {
-                        signals.push_back((dest.clone(), output.clone(), Pulse::Low));
-                        pulses_sent.0 += 1;
-                    }
-                }
-                Pulse::High => {
-                    for output in c.outputs.iter() {
-                        signals.push_back((dest.clone(), output.clone(), Pulse::High));
-                        pulses_sent.1 += 1;
-                    }
-                }
-            },
-            _ => {}
+            }
         }
     }
 
@@ -222,15 +199,15 @@ fn simulate_button_press(modules: &mut HashMap<String, Module>) -> (usize, usize
 fn solution(input: &str) -> usize {
     let mut modules = load_modules(input);
 
-    println!("{:?}", modules);
-
     let mut low_sent = 0;
     let mut high_sent = 0;
 
-    for i in 0..1000 {
-        let res = simulate_button_press(&mut modules);
-        low_sent += res.0;
-        high_sent += res.1;
+    // We could detect loops when processing and jump through most of this,
+    // but this is basically instant anyway.
+    for _ in 0..1000 {
+        let (low, high) = simulate_button_press(&mut modules);
+        low_sent += low;
+        high_sent += high;
     }
 
     low_sent * high_sent
