@@ -33,6 +33,14 @@ impl Add<Dir> for &Coord {
     }
 }
 
+impl Add<(i32, i32)> for &Coord {
+    type Output = Coord;
+
+    fn add(self, rhs: (i32, i32)) -> Self::Output {
+        Coord(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
+
 #[derive(Debug, Copy, Clone, Hash)]
 enum Plot {
     Rock,
@@ -79,16 +87,65 @@ impl Board {
 
     /// Get the value of the board at the given coordinate, or None if the coordinates
     /// are off the board.
-    fn get(&self, c: &Coord) -> Option<Plot> {
-        if c.0 < 0 || c.1 < 0 {
-            return None;
+    fn get(&self, c: &Coord) -> Plot {
+        let (rows, cols) = self.size();
+        let mut row = c.0 % (rows as i32);
+        let mut col = c.1 % (cols as i32);
+
+        if row < 0 {
+            row += rows as i32;
         }
 
-        self.inner
-            .get(c.0 as usize)
-            .and_then(|row| row.get(c.1 as usize))
-            .cloned()
+        if col < 0 {
+            col += cols as i32;
+        }
+
+        *self
+            .inner
+            .get(row as usize)
+            .and_then(|row| row.get(col as usize))
+            .unwrap()
     }
+
+    // Visualize the board with a given frontier. x and y are the number
+    // of extra boards to the left and right to print.
+    #[cfg(feature = "interactive")]
+    fn visualize(&self, x: i32, y: i32, frontier: &HashSet<Coord>) {
+        // Move cursor to 0, 0
+        print!("\x1B[0;0H");
+
+        let (rows, cols) = self.size();
+        let rows = rows as i32;
+        let cols = cols as i32;
+
+        for y_copy in -y..=y {
+            for row in 0..rows {
+                for x_copy in -x..=x {
+                    let origin = Coord(y_copy * rows, x_copy * cols);
+                    for col in 0..cols {
+                        let cell = &origin + (row, col);
+
+                        if frontier.contains(&cell) {
+                            print!("O")
+                        } else {
+                            let c = match self.get(&cell) {
+                                Plot::Rock => '#',
+                                Plot::Garden => '.',
+                            };
+                            print!("{}", c);
+                        }
+                    }
+                }
+                println!();
+            }
+        }
+    }
+}
+
+/// Wait for an enter press
+#[cfg(feature = "interactive")]
+fn wait() {
+    std::io::stdin().read_line(&mut String::new()).unwrap();
 }
 
 fn solution(input: &str, steps: usize) -> usize {
@@ -100,27 +157,40 @@ fn solution(input: &str, steps: usize) -> usize {
     let mut frontier: HashSet<Coord> = HashSet::new();
     frontier.insert(board.start);
 
-    for _ in 0..steps {
+    for i in 0..steps {
+        if i % 10 == 0 {
+            println!("{}", i);
+        }
         let mut next_frontier: HashSet<Coord> = HashSet::new();
 
         for coord in frontier.iter() {
             for dir in [Dir::North, Dir::East, Dir::South, Dir::West] {
                 let neighbor = coord + dir;
-                if let Some(Plot::Garden) = board.get(&neighbor) {
+                if let Plot::Garden = board.get(&neighbor) {
                     next_frontier.insert(neighbor);
                 }
             }
         }
 
         frontier = next_frontier;
+
+        #[cfg(feature = "interactive")]
+        {
+            board.visualize(2, 2, &frontier);
+            wait();
+        }
     }
 
-    frontier.len()
+    0
 }
 
 fn main() {
-    let input = include_str!("../input.txt");
-    let res = solution(input, 64);
+    // Clear the screen
+    #[cfg(feature = "interactive")]
+    print!("\x1B[2J");
+
+    let input = include_str!("../example.txt");
+    let res = solution(input, 5000);
 
     println!("Result: {}", res);
 }
