@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::Add;
 
 /// A (row, col) coordinate pair or vector. Using i32 so that we can subtract
@@ -152,62 +152,58 @@ fn wait() {
     std::io::stdin().read_line(&mut String::new()).unwrap();
 }
 
-fn solution(input: &str, steps: usize) -> usize {
+/// Walk around the garden for a given number of steps. Returns a map
+/// of coordinates to the step number that we reached that position at.
+fn walk_around(input: &str, steps: usize) -> HashMap<Coord, usize> {
     let board = Board::from_input(input);
 
-    let parity = ((steps) % 2) as i32;
-
-    // Start by figuring out the total number of cells we could have visited
-    // after the given number of steps
     let mut frontier: VecDeque<Coord> = VecDeque::new();
-    let mut visited: HashSet<Coord> = HashSet::new();
+    let mut visited: HashMap<Coord, usize> = HashMap::new();
 
     let start = Coord(0, 0);
     frontier.push_back(start);
-    visited.insert(start);
+    visited.insert(start, 0);
 
-    for i in 1..=steps {
+    for step in 1..=steps {
         for _ in 0..frontier.len() {
             let coord = frontier.pop_front().unwrap();
 
             for dir in [Dir::North, Dir::East, Dir::South, Dir::West] {
                 let neighbor = &coord + dir;
 
-                if visited.contains(&neighbor) {
+                if visited.contains_key(&neighbor) {
                     continue;
                 }
 
                 if let Plot::Garden = board.get(&neighbor) {
                     frontier.push_back(neighbor);
-                    visited.insert(neighbor);
+                    visited.insert(neighbor, step);
                 }
             }
         }
 
         #[cfg(feature = "interactive")]
-        if (i - 65) % 131 == 0 {
+        if (step - 65) % 131 == 0 {
             print!("\x1B[2J");
-            board.visualize(3, 2, &visited);
-            println!("Step {}", i);
+            board.visualize(2, 2, &HashSet::from_iter(visited.keys().cloned()));
+            println!("Step {}", step);
             println!("Frontier length: {}", frontier.len());
             wait();
         }
     }
 
-    #[cfg(feature = "interactive")]
-    {
-        visited.retain(|coord| ((coord.0 + coord.1) % 2).abs() == parity);
-        board.visualize(3, 2, &visited);
-        wait();
-    }
+    visited
+}
 
-    visited.iter().fold(0usize, move |accum, coord| {
-        if ((coord.0 + coord.1) % 2).abs() == parity {
-            accum + 1
-        } else {
-            accum
-        }
-    })
+fn solution(input: &str, steps: usize) -> usize {
+    let visited = walk_around(input, steps);
+
+    let parity = (steps % 2) as i32;
+
+    visited
+        .keys()
+        .filter(|coord| ((coord.0 + coord.1) % 2).abs() == parity)
+        .count()
 }
 
 fn main() {
@@ -215,10 +211,10 @@ fn main() {
     #[cfg(feature = "interactive")]
     print!("\x1B[2J");
 
-    let input = include_str!("../input.txt");
+    let input = include_str!("../example.txt");
 
     // See README.md - we use this result to compute the actual answer
-    let res = solution(input, 2 * 131 + 65);
+    let res = solution(input, 1000);
 
     println!("Result: {}", res);
 }
