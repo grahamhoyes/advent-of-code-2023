@@ -211,12 +211,16 @@ fn main() {
     #[cfg(feature = "interactive")]
     print!("\x1B[2J");
 
-    let input = include_str!("../example.txt");
+    let input = include_str!("../input.txt");
 
     // See README.md - we use this result to compute the actual answer
-    let res = solution(input, 1000);
+    for i in 0..3 {
+        let res = solution(input, i * 131 + 65);
+        println!("{}: {}", i, res);
+    }
+    // let res = solution(input, 1000);
 
-    println!("Result: {}", res);
+    // println!("Result: {}", res);
 }
 
 #[cfg(test)]

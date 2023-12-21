@@ -47,7 +47,7 @@ That won't work, however, again because of parity. When a diamond reaches the ed
 
 However, we're still missing one big piece.
 
-### Corers Exist
+### Corners Exist
 
 Our discussion thus far has involved solving for the center diamond, then tiling it out. However, this doesn't account for the corners in the input. I had hoped they were designed to produce nicely tiled copies of the center diamond, but nope - we'll end up with different diamonds formed from the adjacent copies of the input corners.
 
@@ -68,7 +68,13 @@ At this point, we have three options:
     - However, it is divisible by 5, so we just tile a 5x5 region instead! That is reach at 720 steps from the origin, so we have our program calculate that.
     - For whatever reason, I can't get this to work.
 
+### It's just a quadratic apparently
 
+It is at this point that I decided I wanted to enjoy time off with my family, so I skimmed the reddit. There were some computational solutions that were similar to what I had so far regarding parity, and I'm pretty sure I could have got option #3 above to work. However, a couple posts mentioned a quadratic fit, so I gave that a try...
 
-Higher than 635163640499944
-Lower than  637128064130292
+And it didn't work. Turns out I had a typo in my spreadsheet tracking things, I had recorded the number of possible places at step 65 as 3994 rather than 3944 🙃. Always copy-paste, kids!
+
+In the end, it was just a matter of having our program solve for `steps = 65 + 131*n` for n in (0, 1, 2), which covers up to a 5x5 diamond grid as we've discussed above. Fitting a quadratic to that (I just used wolfram alpha) and evaluating at n=202300 gives the desired answer of 634549784009844. As we've seen above, this relies on a number of input-specific properties:
+- There is a diamond-shaped buffer region that allows the wavefronts to "repair"
+- The starting point is at the center of the input
+- Parity plays into this somehow, but I can't yet reason how.
