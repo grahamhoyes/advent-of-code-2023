@@ -135,10 +135,14 @@ impl Board {
                             print!("{}", c);
                         }
                     }
+                    // print!("  ")
                 }
                 println!();
             }
+            // println!();
         }
+
+        // println!();
     }
 }
 
@@ -151,13 +155,16 @@ fn wait() {
 fn solution(input: &str, steps: usize) -> usize {
     let board = Board::from_input(input);
 
+    let parity = ((steps) % 2) as i32;
+
     // Start by figuring out the total number of cells we could have visited
     // after the given number of steps
     let mut frontier: VecDeque<Coord> = VecDeque::new();
     let mut visited: HashSet<Coord> = HashSet::new();
 
-    frontier.push_back(Coord(0, 0));
-    visited.insert(Coord(0, 0));
+    let start = Coord(0, 0);
+    frontier.push_back(start);
+    visited.insert(start);
 
     for i in 1..=steps {
         for _ in 0..frontier.len() {
@@ -178,28 +185,24 @@ fn solution(input: &str, steps: usize) -> usize {
         }
 
         #[cfg(feature = "interactive")]
-        {
+        if (i - 65) % 131 == 0 {
             print!("\x1B[2J");
-            board.visualize(2, 2, &visited);
+            board.visualize(3, 2, &visited);
             println!("Step {}", i);
             println!("Frontier length: {}", frontier.len());
             wait();
         }
     }
 
-    // Now of those that were visited, we just need to figure out
-    // which ones parity is reachable on this turn.
-    let parity = (steps % 2) as i32;
-
     #[cfg(feature = "interactive")]
     {
-        visited.retain(|coord| (coord.0 + coord.1) % 2 == parity);
-        board.visualize(2, 2, &visited);
+        visited.retain(|coord| ((coord.0 + coord.1) % 2).abs() == parity);
+        board.visualize(3, 2, &visited);
         wait();
     }
 
     visited.iter().fold(0usize, move |accum, coord| {
-        if (coord.0 + coord.1) % 2 == parity {
+        if ((coord.0 + coord.1) % 2).abs() == parity {
             accum + 1
         } else {
             accum
@@ -212,8 +215,10 @@ fn main() {
     #[cfg(feature = "interactive")]
     print!("\x1B[2J");
 
-    let input = include_str!("../example.txt");
-    let res = solution(input, 50);
+    let input = include_str!("../input.txt");
+
+    // See README.md - we use this result to compute the actual answer
+    let res = solution(input, 2 * 131 + 65);
 
     println!("Result: {}", res);
 }
