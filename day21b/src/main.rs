@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::ops::Add;
 
 /// A (row, col) coordinate pair or vector. Using i32 so that we can subtract
@@ -89,8 +89,8 @@ impl Board {
     /// are off the board.
     fn get(&self, c: &Coord) -> Plot {
         let (rows, cols) = self.size();
-        let mut row = c.0 % (rows as i32);
-        let mut col = c.1 % (cols as i32);
+        let mut row = (c.0 + self.start.0) % (rows as i32);
+        let mut col = (c.1 + self.start.1) % (cols as i32);
 
         if row < 0 {
             row += rows as i32;
@@ -121,7 +121,7 @@ impl Board {
         for y_copy in -y..=y {
             for row in 0..rows {
                 for x_copy in -x..=x {
-                    let origin = Coord(y_copy * rows, x_copy * cols);
+                    let origin = Coord(y_copy * rows - self.start.0, x_copy * cols - self.start.1);
                     for col in 0..cols {
                         let cell = &origin + (row, col);
 
@@ -151,37 +151,60 @@ fn wait() {
 fn solution(input: &str, steps: usize) -> usize {
     let board = Board::from_input(input);
 
-    // To figure out the number of places we could be after the given
-    // number of steps, we just need to do BFS and clearing the visited
-    // set on each turn.
-    let mut frontier: HashSet<Coord> = HashSet::new();
-    frontier.insert(board.start);
+    // Start by figuring out the total number of cells we could have visited
+    // after the given number of steps
+    let mut frontier: VecDeque<Coord> = VecDeque::new();
+    let mut visited: HashSet<Coord> = HashSet::new();
 
-    for i in 0..steps {
-        if i % 10 == 0 {
-            println!("{}", i);
-        }
-        let mut next_frontier: HashSet<Coord> = HashSet::new();
+    frontier.push_back(Coord(0, 0));
+    visited.insert(Coord(0, 0));
 
-        for coord in frontier.iter() {
+    for i in 1..=steps {
+        for _ in 0..frontier.len() {
+            let coord = frontier.pop_front().unwrap();
+
             for dir in [Dir::North, Dir::East, Dir::South, Dir::West] {
-                let neighbor = coord + dir;
+                let neighbor = &coord + dir;
+
+                if visited.contains(&neighbor) {
+                    continue;
+                }
+
                 if let Plot::Garden = board.get(&neighbor) {
-                    next_frontier.insert(neighbor);
+                    frontier.push_back(neighbor);
+                    visited.insert(neighbor);
                 }
             }
         }
 
-        frontier = next_frontier;
-
         #[cfg(feature = "interactive")]
         {
-            board.visualize(2, 2, &frontier);
+            print!("\x1B[2J");
+            board.visualize(2, 2, &visited);
+            println!("Step {}", i);
+            println!("Frontier length: {}", frontier.len());
             wait();
         }
     }
 
-    0
+    // Now of those that were visited, we just need to figure out
+    // which ones parity is reachable on this turn.
+    let parity = (steps % 2) as i32;
+
+    #[cfg(feature = "interactive")]
+    {
+        visited.retain(|coord| (coord.0 + coord.1) % 2 == parity);
+        board.visualize(2, 2, &visited);
+        wait();
+    }
+
+    visited.iter().fold(0usize, move |accum, coord| {
+        if (coord.0 + coord.1) % 2 == parity {
+            accum + 1
+        } else {
+            accum
+        }
+    })
 }
 
 fn main() {
@@ -190,7 +213,7 @@ fn main() {
     print!("\x1B[2J");
 
     let input = include_str!("../example.txt");
-    let res = solution(input, 5000);
+    let res = solution(input, 50);
 
     println!("Result: {}", res);
 }
@@ -202,9 +225,9 @@ mod tests {
     #[test]
     fn test_example() {
         let input = include_str!("../example.txt");
-        let res = solution(input, 6);
+        let res = solution(input, 100);
 
-        assert_eq!(res, 16);
+        assert_eq!(res, 6536);
     }
 
     #[test]
